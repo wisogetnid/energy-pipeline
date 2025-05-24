@@ -1,0 +1,19 @@
+meta {
+  name: Current Gas Readings
+  type: http
+  seq: 8
+}
+
+get {
+  url: https://api.glowmarkt.com/api/v0-1/resource/{{resource-id}}/current
+  body: none
+  auth: inherit
+}
+
+headers {
+  token: {{api-token}}
+}
+
+vars:pre-request {
+  resource-id: {{rid-gas-consumption}}
+}

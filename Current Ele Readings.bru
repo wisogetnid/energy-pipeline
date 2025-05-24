@@ -1,0 +1,19 @@
+meta {
+  name: Current Ele Readings
+  type: http
+  seq: 7
+}
+
+get {
+  url: https://api.glowmarkt.com/api/v0-1/resource/{{resource-id}}/current
+  body: none
+  auth: inherit
+}
+
+headers {
+  token: {{api-token}}
+}
+
+vars:pre-request {
+  resource-id: {{rid-ele-consumption}}
+}

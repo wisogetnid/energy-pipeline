@@ -1,0 +1,27 @@
+meta {
+  name: Gas Readings
+  type: http
+  seq: 5
+}
+
+get {
+  url: https://api.glowmarkt.com/api/v0-1/resource/{{resource-id}}/readings?from=2025-05-22T00:00:00&to=2025-05-23T23:59:59&period=PT30M&offset=0&function=sum
+  body: none
+  auth: inherit
+}
+
+params:query {
+  from: 2025-05-22T00:00:00
+  to: 2025-05-23T23:59:59
+  period: PT30M
+  offset: 0
+  function: sum
+}
+
+headers {
+  token: {{api-token}}
+}
+
+vars:pre-request {
+  resource-id: {{rid-gas-consumption}}
+}

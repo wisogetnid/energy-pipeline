@@ -1,0 +1,23 @@
+meta {
+  name: Authenticate
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://api.glowmarkt.com/api/v0-1/auth
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+  "username": "{{api-user}}",
+  "password": "{{api-pass}}"
+  }
+}
+
+script:post-response {
+  let data = res.body;
+  bru.setEnvVar("api-token", data.token);
+}

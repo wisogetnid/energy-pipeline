@@ -1,0 +1,15 @@
+meta {
+  name: VE Resources
+  type: http
+  seq: 4
+}
+
+get {
+  url: https://api.glowmarkt.com/api/v0-1/virtualentity/{{virtual-entity-id}}/resources
+  body: none
+  auth: inherit
+}
+
+headers {
+  token: {{api-token}}
+}
