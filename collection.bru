@@ -2,3 +2,22 @@ headers {
   Content-Type: application/json
   applicationId: b0f1b774-a586-4f72-9edd-27ead8aa7a8d
 }
+
+docs {
+  # Glowmarkt API
+  
+  ## Documentation
+  - https://www.smartme.co.uk/meter-data#apis
+  - https://api.glowmarkt.com/api-docs/v0-1/resourcesys/#/
+  - https://bitbucket.org/ijosh/brightglowmarkt/src/master/
+  
+  ## Usage
+  1. Request _Authenticate_ first, to refresh your api-token (just to make sure)
+  2. Use endpoints in entities or readings
+  
+  ## Environment variables
+  - _api-user/api-pass_ are Bruno secret env variables
+  - _api-token_ gets extracted and set in the _Authenticate_ endpoint
+  - _resourceId_ are set as standard env variables
+  
+}
