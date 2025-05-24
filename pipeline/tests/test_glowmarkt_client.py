@@ -63,7 +63,7 @@ class TestGlowmarktClient:
                 assert result == mock_readings_response.json.return_value
     
     def test_get_readings_with_date_range(self, mock_token, sample_resource_id, 
-                                         sample_date_range, mock_empty_readings_response):
+                                     sample_date_range, mock_empty_readings_response):
         # Create client with existing token
         client = GlowmarktClient(token=mock_token)
         
@@ -74,6 +74,15 @@ class TestGlowmarktClient:
                 start_date=sample_date_range["start_date"], 
                 end_date=sample_date_range["end_date"]
             )
+            
+            # Assert the request was called
+            mock_get.assert_called_once()
+            
+            # Make sure call_args exists and has params
+            assert mock_get.call_args is not None
+            assert len(mock_get.call_args) >= 2
+            assert mock_get.call_args[1] is not None
+            assert "params" in mock_get.call_args[1]
             
             # Assert the request parameters
             params = mock_get.call_args[1]["params"]
@@ -105,25 +114,27 @@ class TestGlowmarktClient:
         # Test connection error
         with patch("requests.get", side_effect=requests.exceptions.ConnectionError("Connection failed")):
             with pytest.raises(ConnectionError):
-                client.get_virtual_entities()  # Using virtual_entities instead of resources
+                client.get_virtual_entities()
         
         # Test JSON decode error
         mock_response = Mock()
         mock_response.status_code = 200
+        mock_response.content = b""  # Add this line
         mock_response.json.side_effect = ValueError("Invalid JSON")
         
         with patch("requests.get", return_value=mock_response):
             with pytest.raises(ValueError):
-                client.get_virtual_entities()  # Using virtual_entities instead of resources
+                client.get_virtual_entities()
         
         # Test HTTP error
         mock_response = Mock()
         mock_response.status_code = 403
+        mock_response.content = b""  # Add this line
         mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("Forbidden")
         
         with patch("requests.get", return_value=mock_response):
             with pytest.raises(Exception):
-                client.get_virtual_entities()  # Using virtual_entities instead of resources
+                client.get_virtual_entities()
     
     def test_get_readings_with_offset(self, mock_token, sample_resource_id, mock_readings_response):
         # Create client with existing token
@@ -187,7 +198,7 @@ class TestGlowmarktClient:
             # Assert data was returned
             assert result == mock_virtual_entities_response.json.return_value
             assert isinstance(result, list)
-            assert len(result) > 0
+            assert result  # Checks if non-empty
             
             # Verify structure of the first entity
             entity = result[0]

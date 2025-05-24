@@ -1,3 +1,4 @@
+import json
 import requests
 from datetime import datetime, timedelta
 
@@ -74,43 +75,25 @@ class GlowmarktClient:
         return self._make_request(url, headers=headers)
         
     def get_readings(self, resource_id, start_date=None, end_date=None, period="PT30M", function="sum", offset=None):
-        """Get readings for a specific resource.
-        
-        Args:
-            resource_id (str): The resource ID to fetch data for
-            start_date (str or datetime, optional): Start date for readings
-            end_date (str or datetime, optional): End date for readings
-            period (str, optional): Data granularity (e.g., "PT30M" for 30 minutes)
-                Valid values: PT1M, PT30M, PT1H, P1D, P1W, P1M, P1Y
-            function (str, optional): Aggregation function to apply
-            offset (int, optional): Timezone offset in minutes from UTC
-                For BST (UTC+1): -60, for EST (UTC-5): +300
-            
-        Returns:
-            dict: The JSON response containing readings data
-            
-        Raises:
-            ValueError: If no token is available and no credentials were provided
-            ConnectionError: If there's a network error
-            Exception: If the API returns an error
-        """
+        """Get readings for a specific resource."""
         if not self.token and not (self.username and self.password):
             raise ValueError("No authentication token or credentials provided")
-            
+        
         if not self.token:
             self.authenticate()
-            
+        
         # Default to last 7 days if no dates provided
         if not start_date:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=7)
-            
+        
         # Format dates if they're datetime objects
         if isinstance(start_date, datetime):
             start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
         if isinstance(end_date, datetime):
             end_date = end_date.strftime("%Y-%m-%dT%H:%M:%S")
-            
+        
+        # Use proper URL and params approach instead of building URL manually
         url = f"{self.base_url}/resource/{resource_id}/readings"
         params = {
             "from": start_date,
@@ -122,7 +105,7 @@ class GlowmarktClient:
         # Add offset parameter if provided
         if offset is not None:
             params["offset"] = offset
-            
+        
         headers = {
             "Content-Type": "application/json",
             "applicationId": self.application_id,
@@ -131,27 +114,11 @@ class GlowmarktClient:
         
         return self._make_request(url, params=params, headers=headers)
     
-    def _make_request(self, url, method="get", params=None, headers=None, json=None):
-        """Make an HTTP request to the Glowmarkt API.
-        
-        Args:
-            url (str): The API endpoint URL
-            method (str, optional): HTTP method (get, post, etc.)
-            params (dict, optional): Query parameters
-            headers (dict, optional): HTTP headers
-            json (dict, optional): JSON payload for POST requests
-            
-        Returns:
-            dict: The JSON response from the API
-            
-        Raises:
-            ConnectionError: If there's a network error
-            ValueError: If the response is not valid JSON
-            Exception: If the HTTP status code indicates an error
-        """
+    def _make_request(self, url, method="get", params=None, headers=None, json_data=None):
+        """Make an HTTP request to the Glowmarkt API."""
         try:
             request_method = getattr(requests, method.lower())
-            response = request_method(url, params=params, headers=headers, json=json)
+            response = request_method(url, params=params, headers=headers, json=json_data)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.ConnectionError as e:
