@@ -69,3 +69,31 @@ def auth_patch(mock_auth_response):
 def get_patch(mock_readings_response):
     """Return a context manager that patches requests.get."""
     return patch("requests.get", return_value=mock_readings_response)
+
+@pytest.fixture
+def mock_virtual_entities_response():
+    """Return a mock response for virtual entities data."""
+    response = Mock()
+    response.json.return_value = [
+        {
+            "name": "Smart Home 1",
+            "veId": "dc9069a7-7695-43fd-8f27-16b1c94213da",
+            "veTypeId": "cc90b599-2705-4b13-98d4-3306f81169cf",
+            "ownerId": "f78a3812-d4fc-4b00-99c5-20fd581721a6",
+            "applicationId": "b0f1b774-a586-4f72-9edd-27ead8aa7a8d",
+            "updatedAt": "2018-10-26T17:10:02.670Z",
+            "createdAt": "2018-10-26T17:10:02.670Z",
+            "resources": [
+                {
+                    "resourceId": "73f70bcd-3743-4009-a2c4-e98cc959c030",
+                    "resourceTypeId": "ea02304a-2820-4ea0-8399-f1d1b430c3a0"
+                },
+                {
+                    "resourceId": "b120977-aeb6-4b56-a0d3-d4a9b485848a",
+                    "resourceTypeId": "b4158501-a678-484a-837a-874194d3bd48"
+                }
+            ]
+        }
+    ]
+    response.status_code = 200
+    return response

@@ -2,6 +2,8 @@
 
 The Hildebrand Glowmarkt API (should) allows people to retrieve their energy data over an API.
 
+You can run the project using `python -m pipeline`
+
 ## Tools
 - [Bruno](https://www.usebruno.com/) scripts to manually explore the API
 - python env setup, as suggested in a post on [staticnet.io](https://staticnet.io/macos-python-dev-env/)
