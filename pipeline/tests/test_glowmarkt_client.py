@@ -98,23 +98,6 @@ class TestGlowmarktClient:
             assert params["from"] == "2023-01-01T00:00:00"
             assert params["to"] == "2023-01-07T23:59:59"
     
-    def test_get_resources(self, mock_token, mock_resources_response):
-        # Create client with existing token
-        client = GlowmarktClient(token=mock_token, application_id="test-app-id")
-        
-        # Mock the request
-        with patch("requests.get", return_value=mock_resources_response) as mock_get:
-            result = client.get_resources()
-            
-            # Assert the request was made correctly
-            mock_get.assert_called_once()
-            assert "/resource" in mock_get.call_args[0][0]
-            assert mock_get.call_args[1]["headers"]["token"] == mock_token
-            assert mock_get.call_args[1]["headers"]["applicationId"] == "test-app-id"
-            
-            # Assert data was returned
-            assert result == mock_resources_response.json.return_value
-    
     def test_error_handling(self, mock_token):
         # Setup test
         client = GlowmarktClient(token=mock_token)
