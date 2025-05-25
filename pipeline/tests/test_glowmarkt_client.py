@@ -211,3 +211,55 @@ class TestGlowmarktClient:
             assert isinstance(resources, list)
             assert len(resources) == 2
             assert resources[0]["resourceId"] == "73f70bcd-3743-4009-a2c4-e98cc959c030"
+    
+    def test_get_virtual_entity_resources(self, mock_token, mock_ve_resources_response):
+        """Test getting detailed resource information for a virtual entity."""
+        # Create client with existing token
+        client = GlowmarktClient(token=mock_token, application_id="b0f1b774-a586-4f72-9edd-27ead8aa7a8d")
+        
+        # Sample VE ID from the fixture
+        ve_id = "dc9069a7-7695-43fd-8f27-16b1c94213da"
+        
+        # Mock the request
+        with patch("requests.get", return_value=mock_ve_resources_response) as mock_get:
+            result = client.get_virtual_entity_resources(ve_id)
+            
+            # Assert the request was made correctly
+            mock_get.assert_called_once()
+            assert f"/virtualentity/{ve_id}/resources" in mock_get.call_args[0][0]
+            assert mock_get.call_args[1]["headers"]["token"] == mock_token
+            assert mock_get.call_args[1]["headers"]["applicationId"] == "b0f1b774-a586-4f72-9edd-27ead8aa7a8d"
+            assert mock_get.call_args[1]["headers"]["Content-Type"] == "application/json"
+            
+            # Assert data was returned
+            response_data = mock_ve_resources_response.json.return_value
+            assert result == response_data
+            assert result["name"] == "Smart Home 1"
+            assert result["veId"] == ve_id
+            
+            # Check resources array
+            resources = result["resources"]
+            assert isinstance(resources, list)
+            assert len(resources) == 4
+            
+            # Verify specific resource details
+            electricity = resources[0]
+            assert electricity["name"] == "electricity"
+            assert electricity["classifier"] == "electricity.consumption"
+            assert electricity["baseUnit"] == "kWh"
+            
+            gas = resources[2]
+            assert gas["name"] == "gas"
+            assert gas["classifier"] == "gas.consumption"
+            assert gas["baseUnit"] == "kWh"
+            
+            # Verify cost resources
+            electricity_cost = resources[1]
+            assert electricity_cost["name"] == "electricity cost"
+            assert electricity_cost["classifier"] == "electricity.consumption.cost"
+            assert electricity_cost["baseUnit"] == "pence"
+            
+            gas_cost = resources[3]
+            assert gas_cost["name"] == "gas cost"
+            assert gas_cost["classifier"] == "gas.consumption.cost"
+            assert gas_cost["baseUnit"] == "pence"

@@ -114,6 +114,39 @@ class GlowmarktClient:
         
         return self._make_request(url, params=params, headers=headers)
     
+    def get_virtual_entity_resources(self, ve_id):
+        """Get detailed resource information for a specific virtual entity.
+        
+        This endpoint returns the full definition of all resources that belong to a 
+        virtual entity, including detailed information like resource type, classifier,
+        description, and base unit.
+        
+        Args:
+            ve_id (str): The ID of the virtual entity
+            
+        Returns:
+            dict: Virtual entity details with full resource definitions
+            
+        Raises:
+            ValueError: If no token is available and no credentials were provided
+            ConnectionError: If there's a network error
+            Exception: If the API returns an error
+        """
+        if not self.token and not (self.username and self.password):
+            raise ValueError("No authentication token or credentials provided")
+            
+        if not self.token:
+            self.authenticate()
+            
+        url = f"{self.base_url}/virtualentity/{ve_id}/resources"
+        headers = {
+            "Content-Type": "application/json",
+            "applicationId": self.application_id,
+            "token": self.token,
+        }
+        
+        return self._make_request(url, headers=headers)
+    
     def _make_request(self, url, method="get", params=None, headers=None, json_data=None):
         """Make an HTTP request to the Glowmarkt API."""
         try:

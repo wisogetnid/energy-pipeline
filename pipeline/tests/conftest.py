@@ -1,8 +1,19 @@
+import json
+import os
+from pathlib import Path
 import pytest
 from unittest.mock import Mock, patch
 from datetime import datetime
 
 from pipeline.data_retrieval.glowmarkt_client import GlowmarktClient
+
+def load_fixture(filename):
+    """Load a JSON fixture file."""
+    fixtures_dir = Path(__file__).parent / "fixtures"
+    fixture_path = fixtures_dir / filename
+    
+    with open(fixture_path, 'r') as f:
+        return json.load(f)
 
 @pytest.fixture
 def mock_client():
@@ -82,25 +93,23 @@ def auth_patch():
 @pytest.fixture
 def mock_virtual_entities_response():
     """Create a mock response for virtual entities."""
+    response_data = load_fixture("virtual_entities_response.json")
+    
     mock_response = Mock()
     mock_response.status_code = 200
+    mock_response.json.return_value = response_data
+    mock_response.content = json.dumps(response_data).encode('utf-8')
     
-    # Create a realistic mock return value instead of a mock object
-    mock_data = [
-        {
-            "name": "Smart Home 1",
-            "veId": "dc9069a7-7695-43fd-8f27-16b1c94213da",
-            "resources": [
-                {
-                    "resourceId": "73f70bcd-3743-4009-a2c4-e98cc959c030",
-                    "resourceTypeId": "electricity"
-                },
-                {
-                    "resourceId": "4b6ea57c-8f0e-4f9f-8d89-3b7395f1ba3c",
-                    "resourceTypeId": "gas"
-                }
-            ]
-        }
-    ]
-    mock_response.json.return_value = mock_data
+    return mock_response
+
+@pytest.fixture
+def mock_ve_resources_response():
+    """Create a mock response for virtual entity resources."""
+    response_data = load_fixture("virtual_entity_resources_response.json")
+    
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = response_data
+    mock_response.content = json.dumps(response_data).encode('utf-8')
+    
     return mock_response

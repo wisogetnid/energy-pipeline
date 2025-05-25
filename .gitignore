@@ -38,3 +38,6 @@ Thumbs.db.env
 
 # env file
 .env
+
+# data files
+data/

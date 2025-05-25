@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Smart Home 1",
+    "veId": "dc9069a7-7695-43fd-8f27-16b1c94213da",
+    "resources": [
+      {
+        "resourceId": "73f70bcd-3743-4009-a2c4-e98cc959c030",
+        "resourceTypeId": "electricity"
+      },
+      {
+        "resourceId": "4b6ea57c-8f0e-4f9f-8d89-3b7395f1ba3c",
+        "resourceTypeId": "gas"
+      }
+    ]
+  }
+]

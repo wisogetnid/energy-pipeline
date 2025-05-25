@@ -49,7 +49,7 @@ class GlowmarktUI:
         return True
 
     def select_entity(self):
-        """Let user select a virtual entity."""
+        """Automatically select the first virtual entity."""
         try:
             print("\nFetching virtual entities...")
             virtual_entities = self.client.get_virtual_entities()
@@ -58,47 +58,92 @@ class GlowmarktUI:
                 print("No virtual entities found.")
                 return False
             
-            # Display available entities
+            # Display available entities (informational only)
             print("\nAvailable Virtual Entities:")
             for i, entity in enumerate(virtual_entities, 1):
                 print(f"{i}. {entity.get('name', 'Unknown Entity')} (ID: {entity.get('veId')})")
             
-            # Let user choose an entity
-            while True:
-                try:
-                    choice = int(input("\nSelect an entity number: "))
-                    if 1 <= choice <= len(virtual_entities):
-                        self.selected_entity = virtual_entities[choice-1]
-                        break
-                    else:
-                        print(f"Please enter a number between 1 and {len(virtual_entities)}")
-                except ValueError:
-                    print("Please enter a valid number")
+            # Automatically select the first entity
+            self.selected_entity = virtual_entities[0]
             
-            print(f"\nSelected: {self.selected_entity.get('name')}")
+            print(f"\nAutomatically selected first entity: {self.selected_entity.get('name')}")
             return True
         except Exception as e:
             print(f"Error selecting entity: {str(e)}")
             return False
 
     def select_resource(self):
-        """Let user select a resource from the selected entity."""
+        """Let user select a resource from the selected entity with essential information."""
         if not self.selected_entity:
             print("No entity selected.")
             return False
         
-        resources = self.selected_entity.get('resources', [])
+        try:
+            # Get basic resources first
+            basic_resources = self.selected_entity.get('resources', [])
+            if not basic_resources:
+                print("No resources found for this entity.")
+                return False
+            
+            # Get detailed resource information
+            ve_id = self.selected_entity.get('veId')
+            print(f"\nFetching detailed resource information for {self.selected_entity.get('name')}...")
+            
+            detailed_entity = self.client.get_virtual_entity_resources(ve_id)
+            detailed_resources = detailed_entity.get('resources', [])
+            
+            if not detailed_resources:
+                print("No detailed resources found. Using basic resource information.")
+                # Fall back to basic resource selection
+                return self._select_resource_basic(basic_resources)
+            
+            print("\nAvailable Resources:")
+            for i, resource in enumerate(detailed_resources, 1):
+                name = resource.get('name', 'Unknown')
+                classifier = resource.get('classifier', 'Unknown')
+                base_unit = resource.get('baseUnit', 'Unknown')
+                
+                print(f"{i}. {name.title()} ({classifier})")
+                print(f"   Unit: {base_unit}")
+                print("")
+            
+            # Let user choose a resource
+            while True:
+                try:
+                    choice = int(input("\nSelect a resource number: "))
+                    if 1 <= choice <= len(detailed_resources):
+                        selected_resource = detailed_resources[choice-1]
+                        self.selected_resource_id = selected_resource.get('resourceId')
+                        self.selected_resource_name = selected_resource.get('name', 'Unknown')
+                        self.selected_resource_unit = selected_resource.get('baseUnit', 'Unknown')
+                        self.selected_resource_classifier = selected_resource.get('classifier', 'Unknown')
+                        break
+                    else:
+                        print(f"Please enter a number between 1 and {len(detailed_resources)}")
+                except ValueError:
+                    print("Please enter a valid number")
+            
+            print(f"\nSelected: {self.selected_resource_name} ({self.selected_resource_classifier})")
+            print(f"Unit: {self.selected_resource_unit}")
+            return True
+        
+        except Exception as e:
+            print(f"Error fetching detailed resources: {str(e)}")
+            print("Falling back to basic resource selection...")
+            # Fall back to basic resource selection
+            return self._select_resource_basic(basic_resources)
+
+    def _select_resource_basic(self, resources):
+        """Basic resource selection with minimal information."""
         if not resources:
             print("No resources found for this entity.")
             return False
         
-        print("\nAvailable Resources:")
+        print("\nAvailable Resources (Basic Information):")
         for i, resource in enumerate(resources, 1):
-            resource_id = resource.get('resourceId')
-            resource_type = resource.get('resourceTypeId')
-            print(f"{i}. ID: {resource_id}")
-            print(f"   Type: {resource_type}")
-        
+            resource_type = resource.get('resourceTypeId', 'Unknown')
+            print(f"{i}. Type: {resource_type}")
+    
         # Let user choose a resource
         while True:
             try:
@@ -106,13 +151,16 @@ class GlowmarktUI:
                 if 1 <= choice <= len(resources):
                     selected_resource = resources[choice-1]
                     self.selected_resource_id = selected_resource.get('resourceId')
+                    self.selected_resource_name = resource_type
+                    self.selected_resource_unit = "Unknown"
+                    self.selected_resource_classifier = "Unknown"
                     break
                 else:
                     print(f"Please enter a number between 1 and {len(resources)}")
             except ValueError:
                 print("Please enter a valid number")
-        
-        print(f"\nSelected resource ID: {self.selected_resource_id}")
+    
+        print(f"\nSelected: {self.selected_resource_name}")
         return True
 
     def select_time_range(self):
@@ -252,7 +300,12 @@ class GlowmarktUI:
     def confirm_settings(self):
         """Show summary and confirm settings."""
         print("\n=== Data Retrieval Summary ===")
-        print(f"Resource ID: {self.selected_resource_id}")
+        resource_name = getattr(self, 'selected_resource_name', 'Unknown')
+        resource_classifier = getattr(self, 'selected_resource_classifier', 'Unknown')
+        resource_unit = getattr(self, 'selected_resource_unit', '')
+        
+        print(f"Resource: {resource_name} ({resource_classifier})")
+        print(f"Unit: {resource_unit}")
         print(f"Time Range: {self.date_range}")
         print(f"From: {self.start_date.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"To: {self.end_date.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -301,71 +354,102 @@ class GlowmarktUI:
             print("No readings were retrieved for the specified period")
             return
         
+        # Get resource details for better display
+        resource_name = getattr(self, 'selected_resource_name', 'Unknown')
+        resource_unit = getattr(self, 'selected_resource_unit', '')
+        resource_classifier = getattr(self, 'selected_resource_classifier', 'Unknown')
+        
+        print(f"\nShowing {resource_name} readings ({resource_classifier})")
+        print(f"Unit: {resource_unit}")
+        
         print("\nFirst 5 readings:")
         for reading in readings[:5]:
             timestamp = datetime.fromtimestamp(reading[0]/1000).strftime('%Y-%m-%d %H:%M:%S')
             value = reading[1]
-            print(f"  {timestamp}: {value}")
+            print(f"  {timestamp}: {value} {resource_unit}")
         
         print("\nLast 5 readings:")
         for reading in readings[-5:]:
             timestamp = datetime.fromtimestamp(reading[0]/1000).strftime('%Y-%m-%d %H:%M:%S')
             value = reading[1]
-            print(f"  {timestamp}: {value}")
+            print(f"  {timestamp}: {value} {resource_unit}")
 
     def save_data(self, readings):
-        """Ask if user wants to save data and save it if yes."""
+        """Automatically save data to a file."""
         if not readings:
-            return
-            
-        save = input("\nSave data to file? (y/n): ")
-        if save.lower() == 'y':
-            # Create filename based on resource and date range
-            filename = f"readings_{self.selected_resource_id}_{self.start_date.strftime('%Y%m%d')}_to_{self.end_date.strftime('%Y%m%d')}.json"
-            
-            # Format data for saving
-            output_data = {
-                "resource_id": self.selected_resource_id,
-                "start_date": self.start_date.isoformat(),
-                "end_date": self.end_date.isoformat(),
-                "period": self.period,
-                "timezone_offset": self.offset,
-                "readings": readings
-            }
-            
-            with open(filename, 'w') as f:
-                json.dump(output_data, f, indent=2)
-            
-            print(f"Data saved to {filename}")
+            return None
+        
+        # Create filename based on classifier and date range
+        resource_classifier = getattr(self, 'selected_resource_classifier', 'unknown')
+        # Format classifier for filename (remove dots, replace with underscores)
+        safe_classifier = resource_classifier.replace('.', '_').lower()
+        
+        # Ensure data/json directory exists
+        data_dir = os.path.join("data", "json")
+        os.makedirs(data_dir, exist_ok=True)
+        
+        # Create full path with filename
+        filename = f"{safe_classifier}_{self.start_date.strftime('%Y%m%d')}_to_{self.end_date.strftime('%Y%m%d')}.json"
+        filepath = os.path.join(data_dir, filename)
+        
+        # Format data for saving
+        output_data = {
+            "resource_id": self.selected_resource_id,
+            "resource_name": getattr(self, 'selected_resource_name', 'Unknown'),
+            "resource_classifier": getattr(self, 'selected_resource_classifier', 'Unknown'),
+            "resource_unit": getattr(self, 'selected_resource_unit', 'Unknown'),
+            "start_date": self.start_date.isoformat(),
+            "end_date": self.end_date.isoformat(),
+            "period": self.period,
+            "timezone_offset": self.offset,
+            "timezone_name": self.timezone_name,
+            "readings": readings
+        }
+        
+        with open(filepath, 'w') as f:
+            json.dump(output_data, f, indent=2)
+        
+        print(f"\nData automatically saved to {filepath}")
+        return filepath
 
     def run(self):
         """Run the interactive client workflow."""
         try:
             # Steps in sequence
+            print("\nNote: First virtual entity will be automatically selected.")
             if not self.select_entity():
                 return
-                
-            if not self.select_resource():
-                return
-                
-            if not self.select_time_range():
-                return
-                
-            if not self.select_granularity():
-                return
-                
-            if not self.select_timezone():
-                return
-                
-            if not self.confirm_settings():
-                print("Operation cancelled")
-                return
             
-            readings = self.retrieve_data()
-            if readings:
-                self.display_readings(readings)
-                self.save_data(readings)
+            while True:  # Loop to allow multiple resource retrievals
+                if not self.select_resource():
+                    break
                 
+                if not self.select_time_range():
+                    break
+                
+                if not self.select_granularity():
+                    break
+                
+                if not self.select_timezone():
+                    break
+                
+                if not self.confirm_settings():
+                    print("Operation cancelled")
+                    break
+                
+                readings = self.retrieve_data()
+                if readings:
+                    self.display_readings(readings)
+                    filepath = self.save_data(readings)
+                    
+                    # Ask if user wants to retrieve data for another resource
+                    another = input("\nWould you like to retrieve data for another resource? (y/n): ")
+                    if another.lower() != 'y':
+                        break
+                else:
+                    print("Failed to retrieve readings. Please try again.")
+                    break
+                    
             print("\nThank you for using the Interactive Glowmarkt Client!")
         except Exception as e:
             print(f"Error in interactive client: {str(e)}")
