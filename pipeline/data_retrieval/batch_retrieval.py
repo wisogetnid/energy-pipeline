@@ -128,18 +128,6 @@ class BatchRetriever:
         
         return date_ranges
 
-    def _make_request(self, url, method="get", params=None, headers=None, json_data=None):
-        """Make an HTTP request to the Glowmarkt API."""
-        try:
-            request_method = getattr(requests, method.lower())
-            response = request_method(url, params=params, headers=headers, json=json_data)
-            
-            # Rest of the method...
-        except Exception as e:
-            logger.error(f"HTTP request error: {str(e)}")
-            return None
-
-
 def get_historical_readings(
     client: GlowmarktClient,
     resource_id: str,

@@ -7,22 +7,6 @@ from datetime import datetime, timedelta
 from pipeline.data_retrieval.batch_retrieval import BatchRetriever, get_historical_readings
 from pipeline.data_retrieval.glowmarkt_client import GlowmarktClient
 
-@pytest.fixture
-def mock_client():
-    """Return a mock GlowmarktClient."""
-    return Mock(spec=GlowmarktClient)
-
-@pytest.fixture
-def mock_readings_response():
-    """Return a mock response for readings data."""
-    # Create sample readings data - each reading is [timestamp, value]
-    return {
-        "readings": [
-            [1620000000000, 5.5],  # Example timestamp and value
-            [1620001800000, 6.2],
-        ]
-    }
-
 class TestBatchRetriever:
     
     def test_calculate_batch_date_ranges(self):

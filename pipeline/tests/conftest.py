@@ -2,6 +2,13 @@ import pytest
 from unittest.mock import Mock, patch
 from datetime import datetime
 
+from pipeline.data_retrieval.glowmarkt_client import GlowmarktClient
+
+@pytest.fixture
+def mock_client():
+    """Return a mock GlowmarktClient."""
+    return Mock(spec=GlowmarktClient)
+
 @pytest.fixture
 def get_patch():
     """Patch requests.get with a successful response."""
