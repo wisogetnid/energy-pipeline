@@ -24,7 +24,7 @@ class TestGlowmarktClient:
     
     def test_get_readings_with_existing_token(self, mock_token, sample_resource_id, mock_readings_response, get_patch):
         # Create client with existing token
-        client = GlowmarktClient(token=mock_token, application_id="test-app-id")
+        client = GlowmarktClient(token=mock_token, application_id="b0f1b774-a586-4f72-9edd-27ead8aa7a8d")
         
         # Mock the request
         with get_patch as mock_get:
@@ -34,16 +34,22 @@ class TestGlowmarktClient:
             mock_get.assert_called_once()
             assert sample_resource_id in mock_get.call_args[0][0]
             assert mock_get.call_args[1]["headers"]["token"] == mock_token
-            assert mock_get.call_args[1]["headers"]["applicationId"] == "test-app-id"
+            assert mock_get.call_args[1]["headers"]["applicationId"] == "b0f1b774-a586-4f72-9edd-27ead8aa7a8d"
             assert mock_get.call_args[1]["headers"]["Content-Type"] == "application/json"
             
-            # Assert data was returned
-            assert result == mock_readings_response.json.return_value
-    
+            # Assert data was returned and matches the fixture
+            expected_data = mock_readings_response.json.return_value
+            assert result == expected_data
+            assert result["status"] == "OK"
+            assert "electricity consumption" in result["name"]
+            assert isinstance(result["data"], list)
+            assert len(result["data"]) == 2
+            assert result["data"][0][1] == 48.79  # Check the value from the fixture
+
     def test_get_readings_auto_authenticates(self, mock_token, sample_resource_id, 
                                             mock_auth_response, mock_readings_response):
         # Create client without token
-        client = GlowmarktClient(username="test", password="password", application_id="test-app-id")
+        client = GlowmarktClient(username="test", password="password", application_id="b0f1b774-a586-4f72-9edd-27ead8aa7a8d")
         
         # Mock requests
         with patch("requests.post", return_value=mock_auth_response) as mock_post:
@@ -57,11 +63,14 @@ class TestGlowmarktClient:
                 mock_get.assert_called_once()
                 assert sample_resource_id in mock_get.call_args[0][0]
                 assert mock_get.call_args[1]["headers"]["token"] == mock_token
-                assert mock_get.call_args[1]["headers"]["applicationId"] == "test-app-id"
+                assert mock_get.call_args[1]["headers"]["applicationId"] == "b0f1b774-a586-4f72-9edd-27ead8aa7a8d"
                 
-                # Assert data was returned
+                # Assert data was returned and has the correct format
                 assert result == mock_readings_response.json.return_value
-    
+                assert result["status"] == "OK"
+                assert "data" in result
+                assert isinstance(result["data"], list)
+
     def test_get_readings_with_date_range(self, mock_token, sample_resource_id, 
                                      sample_date_range, mock_empty_readings_response):
         # Create client with existing token
@@ -138,7 +147,7 @@ class TestGlowmarktClient:
     
     def test_get_readings_with_offset(self, mock_token, sample_resource_id, mock_readings_response):
         # Create client with existing token
-        client = GlowmarktClient(token=mock_token, application_id="test-app-id")
+        client = GlowmarktClient(token=mock_token, application_id="b0f1b774-a586-4f72-9edd-27ead8aa7a8d")
         
         # Define the offset (BST example from specification)
         offset = -60
@@ -149,10 +158,16 @@ class TestGlowmarktClient:
             
             # Assert the request was made with the correct offset parameter
             assert mock_get.call_args[1]["params"]["offset"] == offset
-    
+            
+            # Verify result matches the fixture data
+            assert result == mock_readings_response.json.return_value
+            assert result["status"] == "OK"
+            assert "resourceId" in result
+            assert "query" in result
+
     def test_get_readings_with_all_parameters(self, mock_token, sample_resource_id, sample_date_range, mock_readings_response):
         # Create client with existing token
-        client = GlowmarktClient(token=mock_token, application_id="test-app-id")
+        client = GlowmarktClient(token=mock_token, application_id="b0f1b774-a586-4f72-9edd-27ead8aa7a8d")
         
         # Define all parameters
         start_date = sample_date_range["start_date"]
@@ -179,6 +194,12 @@ class TestGlowmarktClient:
             assert params["period"] == period
             assert params["function"] == function
             assert params["offset"] == offset
+            
+            # Verify result matches the fixture data
+            assert result == mock_readings_response.json.return_value
+            assert result["query"]["from"] == "2018-04-10T00:00:00"
+            assert result["query"]["to"] == "2018-04-11T23:59:59"
+            assert result["query"]["period"] == "P1D"
     
     def test_get_virtual_entities(self, mock_token, mock_virtual_entities_response):
         # Create client with existing token

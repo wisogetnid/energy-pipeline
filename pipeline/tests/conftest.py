@@ -22,32 +22,38 @@ def mock_client():
 
 @pytest.fixture
 def get_patch():
-    """Patch requests.get with a successful response."""
+    """Patch requests.get with a successful response matching the JSON fixture."""
+    response_data = load_fixture("resource_readings_response.json")
+    
     mock_response = Mock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {"data": [[1620000000000, 5.5], [1620001800000, 6.2]]}
-    # Setup content attribute for response.content checks
-    mock_response.content = b'{"data": [[1620000000000, 5.5], [1620001800000, 6.2]]}'
+    mock_response.json.return_value = response_data
+    mock_response.content = json.dumps(response_data).encode('utf-8')
+    
     return patch("requests.get", return_value=mock_response)
 
 @pytest.fixture
 def mock_readings_response():
     """Create a mock response for readings."""
+    response_data = load_fixture("resource_readings_response.json")
+    
     mock_response = Mock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {"data": [[1620000000000, 5.5], [1620001800000, 6.2]]}
-    # Setup content attribute for response.content checks
-    mock_response.content = b'{"data": [[1620000000000, 5.5], [1620001800000, 6.2]]}'
+    mock_response.json.return_value = response_data
+    mock_response.content = json.dumps(response_data).encode('utf-8')
+    
     return mock_response
 
 @pytest.fixture
 def mock_empty_readings_response():
     """Create a mock response with empty readings."""
+    response_data = load_fixture("empty_resource_readings_response.json")
+    
     mock_response = Mock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {"data": []}
-    # Setup content attribute for response.content checks
-    mock_response.content = b'{"data": []}'
+    mock_response.json.return_value = response_data
+    mock_response.content = json.dumps(response_data).encode('utf-8')
+    
     return mock_response
 
 @pytest.fixture
