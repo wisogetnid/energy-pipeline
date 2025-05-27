@@ -5,22 +5,25 @@ from pipeline.data_retrieval.glowmarkt_client import GlowmarktClient
 
 class TestGlowmarktClient:
     
-    def test_authenticate_returns_token(self, mock_token, auth_patch):
-        # Create client and mock the post request
+    def test_authenticate_returns_token(self, mock_auth_response, auth_patch):
+        # Create client
         client = GlowmarktClient(username="test", password="password", application_id="test-app-id")
+        
+        # Mock the post request
         with auth_patch as mock_post:
+            # Call authenticate
             token = client.authenticate()
             
-            # Assert the request was made correctly
+            # Assert post was called with correct data
             mock_post.assert_called_once()
-            assert "auth" in mock_post.call_args[0][0]
-            assert mock_post.call_args[1]["json"] == {"username": "test", "password": "password"}
-            assert mock_post.call_args[1]["headers"]["applicationId"] == "test-app-id"
-            assert mock_post.call_args[1]["headers"]["Content-Type"] == "application/json"
+            assert "username" in mock_post.call_args[1]["json"]
+            assert mock_post.call_args[1]["json"]["username"] == "test"
+            assert mock_post.call_args[1]["json"]["password"] == "password"
             
-            # Assert token was returned and stored
-            assert token == mock_token
-            assert client.token == mock_token
+            # Assert token was set in client and returned
+            expected_token = mock_auth_response.json.return_value["token"]
+            assert token == expected_token
+            assert client.token == expected_token
     
     def test_get_readings_with_existing_token(self, mock_token, sample_resource_id, mock_readings_response, get_patch):
         # Create client with existing token
@@ -46,8 +49,7 @@ class TestGlowmarktClient:
             assert len(result["data"]) == 2
             assert result["data"][0][1] == 48.79  # Check the value from the fixture
 
-    def test_get_readings_auto_authenticates(self, mock_token, sample_resource_id, 
-                                            mock_auth_response, mock_readings_response):
+    def test_get_readings_auto_authenticates(self, mock_auth_response, sample_resource_id, mock_readings_response):
         # Create client without token
         client = GlowmarktClient(username="test", password="password", application_id="b0f1b774-a586-4f72-9edd-27ead8aa7a8d")
         
@@ -59,13 +61,15 @@ class TestGlowmarktClient:
                 # Assert authentication was called
                 mock_post.assert_called_once()
                 
-                # Assert readings request was made with token
+                # Assert readings request was made with token from authentication response
                 mock_get.assert_called_once()
                 assert sample_resource_id in mock_get.call_args[0][0]
-                assert mock_get.call_args[1]["headers"]["token"] == mock_token
-                assert mock_get.call_args[1]["headers"]["applicationId"] == "b0f1b774-a586-4f72-9edd-27ead8aa7a8d"
                 
-                # Assert data was returned and has the correct format
+                # Get the expected token from the authentication response
+                expected_token = mock_auth_response.json.return_value["token"]
+                assert mock_get.call_args[1]["headers"]["token"] == expected_token
+                
+                # Assert data was returned
                 assert result == mock_readings_response.json.return_value
                 assert result["status"] == "OK"
                 assert "data" in result

@@ -58,16 +58,33 @@ def mock_empty_readings_response():
 
 @pytest.fixture
 def mock_token():
-    """Return a mock token."""
-    return "test-token-123456"
+    """Return a mock token from the authentication response fixture."""
+    auth_data = load_fixture("authentication_response.json")
+    return auth_data["token"]
 
 @pytest.fixture
 def mock_auth_response():
-    """Create a mock response for authentication."""
+    """Create a mock response for authentication using the fixture."""
+    response_data = load_fixture("authentication_response.json")
+    
     mock_response = Mock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {"token": "test-token-123456"}
+    mock_response.json.return_value = response_data
+    mock_response.content = json.dumps(response_data).encode('utf-8')
+    
     return mock_response
+
+@pytest.fixture
+def auth_patch():
+    """Patch requests.post with a successful auth response from fixture."""
+    response_data = load_fixture("authentication_response.json")
+    
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = response_data
+    mock_response.content = json.dumps(response_data).encode('utf-8')
+    
+    return patch("requests.post", return_value=mock_response)
 
 @pytest.fixture
 def sample_resource_id():
@@ -87,14 +104,6 @@ def sample_datetime_range():
         "start_date": datetime(2023, 1, 1, 0, 0, 0),
         "end_date": datetime(2023, 1, 7, 23, 59, 59)
     }
-
-@pytest.fixture
-def auth_patch():
-    """Patch requests.post with a successful auth response."""
-    mock_response = Mock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {"token": "test-token-123456"}
-    return patch("requests.post", return_value=mock_response)
 
 @pytest.fixture
 def mock_virtual_entities_response():
