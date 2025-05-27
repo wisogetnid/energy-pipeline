@@ -1,0 +1,45 @@
+{
+  "resource_id": "e7d48c5a-b142-49f2-8a65-c79d3fb5c7e4",
+  "resource_name": "gas consumption",
+  "resource_classifier": "gas.consumption",
+  "resource_unit": "kWh",
+  "start_date": "2025-05-26T00:00:00",
+  "end_date": "2025-05-27T00:00:00",
+  "period": "PT30M",
+  "timezone_offset": 0,
+  "timezone_name": "UTC",
+  "readings": [
+    [
+      1748217600,
+      0
+    ],
+    [
+      1748219400,
+      0
+    ],
+    [
+      1748232000,
+      4.08431053
+    ],
+    [
+      1748233800,
+      2.0533759
+    ],
+    [
+      1748246400,
+      0.1346476
+    ],
+    [
+      1748248200,
+      0.0336619
+    ],
+    [
+      1748253600,
+      0.2356333
+    ],
+    [
+      1748304000,
+      0
+    ]
+  ]
+}
