@@ -312,9 +312,10 @@ class DataRetrievalUI(BaseUI):
             data_dir = os.path.join("data", "glowmarkt_api_raw")
             os.makedirs(data_dir, exist_ok=True)
             
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
             resource_name_safe = self.selected_resource_name.lower().replace(" ", "_")
-            filename = f"{resource_name_safe}_{timestamp}.json"
+            start_date_str = self.start_date.strftime("%Y%m%d") if isinstance(self.start_date, datetime) else "unknown"
+            end_date_str = self.end_date.strftime("%Y%m%d") if isinstance(self.end_date, datetime) else "unknown"
+            filename = f"{resource_name_safe}_{start_date_str}_to_{end_date_str}.json"
             filepath = os.path.join(data_dir, filename)
             
             data = {

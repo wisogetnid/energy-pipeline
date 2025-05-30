@@ -21,9 +21,12 @@ class EnergyDataConverter:
         data: Union[Dict[str, Any], str, Path], 
         output_file: Optional[Union[str, Path]] = None
     ) -> str:
+        original_filename = None
+        
         if isinstance(data, (str, Path)):
             data_path = Path(data)
             logger.info(f"Loading data from {data_path}")
+            original_filename = data_path.stem
             with open(data_path, 'r') as f:
                 data = json.load(f)
         
@@ -39,9 +42,14 @@ class EnergyDataConverter:
         to_date = query.get("to", data.get("end_date", "unknown"))
         
         if output_file is None:
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-            safe_name = resource_name.lower().replace(" ", "_").replace(".", "_")
-            output_file = self.output_dir / f"{safe_name}_{timestamp}.jsonl"
+            if original_filename:
+                output_file = self.output_dir / f"{original_filename}.jsonl"
+            else:
+                resource_name_safe = resource_name.lower().replace(" ", "_").replace(".", "_")
+                start_date_str = from_date.strftime("%Y%m%d") if isinstance(from_date, datetime) else "unknown"
+                end_date_str = to_date.strftime("%Y%m%d") if isinstance(to_date, datetime) else "unknown"
+                filename = f"{resource_name_safe}_{start_date_str}_to_{end_date_str}.json"
+                output_file = self.output_dir / f"{filename}.jsonl"
         else:
             output_file = Path(output_file)
         
