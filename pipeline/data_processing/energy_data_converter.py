@@ -7,23 +7,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class EnergyDataConverter:
-    """Convert energy data from API format to normalized formats."""
     
     def __init__(self, output_dir: Optional[str] = None):
-        """
-        Initialize the converter.
-        
-        Args:
-            output_dir: Directory to save output files (default: ./data/processed)
-        """
         self.output_dir = Path(output_dir) if output_dir else Path("data/processed")
-        
-        # Create output directory if it doesn't exist
         os.makedirs(self.output_dir, exist_ok=True)
     
     def convert_to_jsonl(
@@ -31,37 +21,23 @@ class EnergyDataConverter:
         data: Union[Dict[str, Any], str, Path], 
         output_file: Optional[Union[str, Path]] = None
     ) -> str:
-        """
-        Convert energy data to JSONL format with each reading as a separate line.
-        
-        Args:
-            data: Either a dictionary containing the data or a path to a JSON file
-            output_file: Path for the output JSONL file (optional)
-            
-        Returns:
-            Path to the saved JSONL file
-        """
-        # Load data if a file path was provided
         if isinstance(data, (str, Path)):
             data_path = Path(data)
             logger.info(f"Loading data from {data_path}")
             with open(data_path, 'r') as f:
                 data = json.load(f)
         
-        # Extract metadata
         resource_id = data.get("resourceId", data.get("resource_id", "unknown"))
         resource_name = data.get("name", data.get("resource_name", "energy consumption"))
         resource_type = data.get("resourceTypeId", data.get("resource_type", "unknown"))
-        classifier = data.get("classifier", data.get("resource_classifier", "unknown"))  # <-- Add resource_classifier as fallback
-        units = data.get("units", data.get("resource_unit", "kWh"))  # <-- Add resource_unit as fallback
+        classifier = data.get("classifier", data.get("resource_classifier", "unknown"))
+        units = data.get("units", data.get("resource_unit", "kWh"))
         
-        # Extract query info if available
         query = data.get("query", {})
         period = query.get("period", data.get("period", "unknown"))
         from_date = query.get("from", data.get("start_date", "unknown"))
         to_date = query.get("to", data.get("end_date", "unknown"))
         
-        # Determine output filename if not provided
         if output_file is None:
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
             safe_name = resource_name.lower().replace(" ", "_").replace(".", "_")
@@ -69,13 +45,10 @@ class EnergyDataConverter:
         else:
             output_file = Path(output_file)
         
-        # Ensure parent directory exists
         output_file.parent.mkdir(parents=True, exist_ok=True)
         
-        # Get readings data - handle different formats
         readings = data.get("data", data.get("readings", []))
         
-        # Count for stats
         count = 0
         
         with open(output_file, 'w') as f:
@@ -83,11 +56,9 @@ class EnergyDataConverter:
                 if isinstance(reading, list) and len(reading) >= 2:
                     timestamp, value = reading[0], reading[1]
                     
-                    # Convert Unix timestamp to ISO format if needed
                     iso_timestamp = None
                     if isinstance(timestamp, (int, float)):
                         try:
-                            # Some APIs return milliseconds, others seconds
                             ts = timestamp / 1000 if timestamp > 9999999999 else timestamp
                             dt = datetime.fromtimestamp(ts)
                             iso_timestamp = dt.isoformat()
@@ -96,7 +67,6 @@ class EnergyDataConverter:
                     else:
                         iso_timestamp = str(timestamp)
                     
-                    # Create data object with metadata and reading
                     data_obj = {
                         "resource_id": resource_id,
                         "resource_name": resource_name,
@@ -111,7 +81,6 @@ class EnergyDataConverter:
                         "value": value
                     }
                     
-                    # Write as JSON line
                     f.write(json.dumps(data_obj) + '\n')
                     count += 1
         
@@ -123,16 +92,6 @@ class EnergyDataConverter:
         file_patterns: List[str], 
         output_dir: Optional[Union[str, Path]] = None
     ) -> List[str]:
-        """
-        Convert multiple energy data files to JSONL format.
-        
-        Args:
-            file_patterns: List of glob patterns to match input files
-            output_dir: Directory for output files (defaults to self.output_dir)
-            
-        Returns:
-            List of paths to the saved JSONL files
-        """
         import glob
         
         if output_dir:
