@@ -4,6 +4,7 @@ from pipeline.ui.base_ui import BaseUI
 from pipeline.ui.data_retrieval_ui import DataRetrievalUI
 from pipeline.ui.data_converter_ui import DataConverterUI
 from pipeline.ui.parquet_converter_ui import ParquetConverterUI
+from pipeline.ui.visualization_ui import VisualizationUI
 
 class MenuUI(BaseUI):
     
@@ -15,8 +16,10 @@ class MenuUI(BaseUI):
         self.retrieval_ui = DataRetrievalUI()
         self.converter_ui = DataConverterUI()
         self.parquet_ui = ParquetConverterUI()
+        self.visualization_ui = VisualizationUI()
         self.last_retrieved_file = None
         self.last_jsonl_file = None
+        self.last_parquet_file = None
         
         if username or token:
             self.retrieval_ui.setup_client(username, password, token)
@@ -32,6 +35,11 @@ class MenuUI(BaseUI):
         if self.last_jsonl_file:
             print(f"Last JSONL file: {self.last_jsonl_file}")
             print("Ready for conversion to Parquet")
+            
+        if self.last_parquet_file:
+            print(f"Last Parquet file: {self.last_parquet_file}")
+            print("Ready for visualization")
+            
         print("----------------------")
     
     def run(self):
@@ -44,10 +52,11 @@ class MenuUI(BaseUI):
                 print("1. Retrieve new data from Glowmarkt API")
                 print("2. Convert JSON data to JSONL format")
                 print("3. Convert JSONL data to Parquet format")
-                print("4. Run complete pipeline (retrieve → JSONL → Parquet)")
-                print("5. Exit")
+                print("4. Generate visualizations")
+                print("5. Run complete pipeline (retrieve → JSONL → Parquet → Visualize)")
+                print("6. Exit")
                 
-                menu_choice = self.get_int_input("\nEnter your choice: ", 1, 5)
+                menu_choice = self.get_int_input("\nEnter your choice: ", 1, 6)
                 
                 if menu_choice == 1:
                     # Retrieve data only
@@ -74,16 +83,20 @@ class MenuUI(BaseUI):
                     if self.last_jsonl_file:
                         print(f"\nUsing last JSONL file: {self.last_jsonl_file}")
                         if self.get_yes_no_input("Would you like to convert this file to Parquet?"):
-                            self.parquet_ui.convert_to_parquet(self.last_jsonl_file)
+                            self.last_parquet_file = self.parquet_ui.convert_to_parquet(self.last_jsonl_file)
                         else:
                             self.parquet_ui.run()
                     else:
                         print("\nNo recently created JSONL file available.")
                         self.parquet_ui.run()
-                    
+                
                 elif menu_choice == 4:
+                    # Generate visualizations
+                    self.visualization_ui.run()
+                    
+                elif menu_choice == 5:
                     # Run complete pipeline
-                    print("\nRunning complete pipeline: retrieve → JSONL → Parquet")
+                    print("\nRunning complete pipeline: retrieve → JSONL → Parquet → Visualize")
                     
                     self.last_retrieved_file = self.retrieval_ui.run()
                     
@@ -95,19 +108,50 @@ class MenuUI(BaseUI):
                         
                         if self.last_jsonl_file:
                             print("\nNow converting to Parquet format...")
-                            parquet_filepath = self.parquet_ui.convert_to_parquet(self.last_jsonl_file)
+                            self.last_parquet_file = self.parquet_ui.convert_to_parquet(self.last_jsonl_file)
                             
-                            if parquet_filepath:
+                            if self.last_parquet_file:
+                                print("\nNow generating visualizations...")
+                                
+                                # Get complementary file if needed for visualization
+                                resource_name = self.last_parquet_file.split("/")[-1].split("_")[0]
+                                date_part = "_".join(self.last_parquet_file.split("/")[-1].split("_")[2:])
+                                
+                                complementary_type = "cost" if "consumption" in self.last_parquet_file else "consumption"
+                                complementary_file = f"{resource_name}_{complementary_type}_{date_part}"
+                                
+                                from pathlib import Path
+                                parquet_dir = Path(self.last_parquet_file).parent
+                                complementary_path = parquet_dir / complementary_file
+                                
+                                if complementary_path.exists():
+                                    from pipeline.visualisation.visualisation import generate_visualizations
+                                    vis_result = generate_visualizations(
+                                        self.last_parquet_file if "cost" in self.last_parquet_file else complementary_path,
+                                        self.last_parquet_file if "consumption" in self.last_parquet_file else complementary_path
+                                    )
+                                    
+                                    if vis_result:
+                                        print("\nVisualization generation successful!")
+                                    else:
+                                        print("\nVisualization generation failed.")
+                                else:
+                                    print(f"\nComplementary file ({complementary_file}) not found.")
+                                    print("Visualizations require both consumption and cost data.")
+                                    print("Please retrieve the complementary data before generating visualizations.")
+                                
                                 print("\nPipeline completed successfully!")
                                 print(f"Original data: {self.last_retrieved_file}")
                                 print(f"JSONL data: {self.last_jsonl_file}")
-                                print(f"Parquet data: {parquet_filepath}")
+                                print(f"Parquet data: {self.last_parquet_file}")
+                            else:
+                                print("\nParquet conversion failed. Pipeline could not complete.")
                         else:
                             print("\nJSONL conversion failed. Pipeline could not complete.")
                     else:
                         print("\nData retrieval failed. Pipeline could not complete.")
                     
-                elif menu_choice == 5:
+                elif menu_choice == 6:
                     print("\nThank you for using the Energy Data Pipeline!")
                     break
                 
