@@ -82,13 +82,13 @@ class DataRetrievalUI(BaseUI):
                 print("No resources found for this entity.")
                 return False
             
-            return self._select_resource_basic(resources)
+            return self._display_and_select_resource(resources)
             
         except Exception as e:
             print(f"Error fetching resources: {str(e)}")
             return False
     
-    def _select_resource_basic(self, resources):
+    def _display_and_select_resource(self, resources):
         print("\nAvailable resources:")
         
         valid_resources = []
@@ -126,38 +126,72 @@ class DataRetrievalUI(BaseUI):
         self.print_header("Time Range Selection")
         
         print("Choose a date range:")
-        print("1. Last 24 hours")
-        print("2. Last 7 days")
-        print("3. Last 30 days")
-        print("4. Last 90 days")
-        print("5. Last year")
-        print("6. Custom range")
+        print("1. Current month")
+        print("2. Previous month")
+        print("3. Two months ago")
+        print("4. Three months ago")
+        print("5. Custom range")
         
-        choice = self.get_int_input("\nSelect a range: ", 1, 6)
+        choice = self.get_int_input("\nSelect a range: ", 1, 5)
         
         now = datetime.now()
+        current_year = now.year
+        current_month = now.month
         
         if choice == 1:
-            self.end_date = now
-            self.start_date = now - timedelta(days=1)
-            self.date_range = "last 24 hours"
+            self.start_date = datetime(current_year, current_month, 1)
+            if current_month == 12:
+                self.end_date = datetime(current_year + 1, 1, 1) - timedelta(seconds=1)
+            else:
+                self.end_date = datetime(current_year, current_month + 1, 1) - timedelta(seconds=1)
+            self.date_range = f"current month ({self.start_date.strftime('%B %Y')})"
+        
         elif choice == 2:
-            self.end_date = now
-            self.start_date = now - timedelta(days=7)
-            self.date_range = "last 7 days"
+            prev_month = current_month - 1
+            prev_year = current_year
+            if prev_month == 0:
+                prev_month = 12
+                prev_year -= 1
+            
+            self.start_date = datetime(prev_year, prev_month, 1)
+            self.end_date = datetime(current_year, current_month, 1) - timedelta(seconds=1)
+            self.date_range = f"previous month ({self.start_date.strftime('%B %Y')})"
+        
         elif choice == 3:
-            self.end_date = now
-            self.start_date = now - timedelta(days=30)
-            self.date_range = "last 30 days"
+            prev_month = current_month - 2
+            prev_year = current_year
+            while prev_month <= 0:
+                prev_month += 12
+                prev_year -= 1
+            
+            next_month = prev_month + 1
+            next_year = prev_year
+            if next_month > 12:
+                next_month = 1
+                next_year += 1
+            
+            self.start_date = datetime(prev_year, prev_month, 1)
+            self.end_date = datetime(next_year, next_month, 1) - timedelta(seconds=1)
+            self.date_range = f"two months ago ({self.start_date.strftime('%B %Y')})"
+        
         elif choice == 4:
-            self.end_date = now
-            self.start_date = now - timedelta(days=90)
-            self.date_range = "last 90 days"
+            prev_month = current_month - 3
+            prev_year = current_year
+            while prev_month <= 0:
+                prev_month += 12
+                prev_year -= 1
+            
+            next_month = prev_month + 1
+            next_year = prev_year
+            if next_month > 12:
+                next_month = 1
+                next_year += 1
+            
+            self.start_date = datetime(prev_year, prev_month, 1)
+            self.end_date = datetime(next_year, next_month, 1) - timedelta(seconds=1)
+            self.date_range = f"three months ago ({self.start_date.strftime('%B %Y')})"
+        
         elif choice == 5:
-            self.end_date = now
-            self.start_date = now - timedelta(days=365)
-            self.date_range = "last year"
-        elif choice == 6:
             try:
                 start_input = input("\nEnter start date (YYYY-MM-DD): ")
                 self.start_date = parser.parse(start_input)
@@ -177,89 +211,12 @@ class DataRetrievalUI(BaseUI):
         print(f"\nSelected date range: {self.date_range}")
         return True
     
-    def select_granularity(self):
-        self.print_header("Data Granularity")
-        
-        print("Choose data granularity:")
-        print("1. 30 minutes (PT30M)")
-        print("2. 1 hour (PT1H)")
-        print("3. 1 day (P1D)")
-        print("4. 1 week (P1W)")
-        print("5. 1 month (P1M)")
-        
-        choice = self.get_int_input("\nSelect a granularity: ", 1, 5)
-        
-        if choice == 1:
-            self.period = "PT30M"
-        elif choice == 2:
-            self.period = "PT1H"
-        elif choice == 3:
-            self.period = "P1D"
-        elif choice == 4:
-            self.period = "P1W"
-        elif choice == 5:
-            self.period = "P1M"
-        
-        print(f"\nSelected granularity: {self.period}")
-        return True
-    
-    def select_timezone(self):
-        self.print_header("Timezone Selection")
-        
-        print("Choose timezone offset:")
-        print("1. UTC (+0)")
-        print("2. UK/Ireland (+0/+1)")
-        print("3. Central Europe (+1/+2)")
-        print("4. US Eastern (-5/-4)")
-        print("5. US Pacific (-8/-7)")
-        print("6. Custom offset")
-        
-        choice = self.get_int_input("\nSelect a timezone: ", 1, 6)
-        
-        if choice == 1:
-            self.offset = 0
-            self.timezone_name = "UTC"
-        elif choice == 2:
-            self.offset = 0  # or 60 during DST
-            self.timezone_name = "UK/Ireland"
-        elif choice == 3:
-            self.offset = 60  # or 120 during DST
-            self.timezone_name = "Central Europe"
-        elif choice == 4:
-            self.offset = -300  # or -240 during DST
-            self.timezone_name = "US Eastern"
-        elif choice == 5:
-            self.offset = -480  # or -420 during DST
-            self.timezone_name = "US Pacific"
-        elif choice == 6:
-            try:
-                custom_offset = int(input("\nEnter offset in minutes (e.g., 60 for +1 hour, -300 for -5 hours): "))
-                self.offset = custom_offset
-                self.timezone_name = f"Custom ({custom_offset} minutes)"
-            except ValueError:
-                print("Invalid offset. Using UTC.")
-                self.offset = 0
-                self.timezone_name = "UTC"
-        
-        print(f"\nSelected timezone: {self.timezone_name} (offset: {self.offset} minutes)")
-        return True
-    
-    def confirm_settings(self):
-        self.print_header("Confirm Settings")
-        
-        print(f"Resource: {self.selected_resource_name} ({self.selected_resource_classifier})")
-        print(f"Date Range: {self.date_range}")
-        print(f"Granularity: {self.period}")
-        print(f"Timezone: {self.timezone_name} (offset: {self.offset} minutes)")
-        print(f"Batch Size: {self.batch_days} days")
-        
-        return self.get_yes_no_input("\nProceed with these settings?")
-    
     def retrieve_data(self):
         self.print_header("Retrieving Data")
         
         try:
             print(f"Fetching data for {self.selected_resource_name} over {self.date_range}...")
+            print(f"Using PT30M granularity and UTC timezone...")
             print(f"This may take a while for large date ranges...")
             
             readings = get_historical_readings(
@@ -350,36 +307,20 @@ class DataRetrievalUI(BaseUI):
         if not self.select_entity():
             return
         
-        while True:
-            if not self.select_resource():
-                break
+        if not self.select_resource():
+            return
             
-            if not self.select_time_range():
-                break
+        if not self.select_time_range():
+            return
+        
+        readings = self.retrieve_data()
+        if readings:
+            self.display_readings(readings)
+            json_filepath = self.save_data(readings)
             
-            if not self.select_granularity():
-                break
-            
-            if not self.select_timezone():
-                break
-            
-            if not self.confirm_settings():
-                print("Operation cancelled")
-                break
-            
-            readings = self.retrieve_data()
-            if readings:
-                self.display_readings(readings)
-                json_filepath = self.save_data(readings)
-                
-                if json_filepath:
-                    return json_filepath
-                
-                another = self.get_yes_no_input("\nWould you like to retrieve data for another resource?")
-                if not another:
-                    break
-            else:
-                print("Failed to retrieve readings. Please try again.")
-                break
+            if json_filepath:
+                return json_filepath
+        else:
+            print("Failed to retrieve readings. Please try again.")
         
         return None
