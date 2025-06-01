@@ -4,7 +4,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from pipeline.data_processing.energy_data_converter import EnergyDataConverter
+from pipeline.data_processing.jsonl_converter import EnergyDataConverter
 from pipeline.data_processing.parquet_converter import JsonlToParquetConverter
 
 def load_fixture(filename):

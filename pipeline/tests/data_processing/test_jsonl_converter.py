@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 
-from pipeline.data_processing.energy_data_converter import EnergyDataConverter
+from pipeline.data_processing.jsonl_converter import EnergyDataConverter
 from pipeline.tests.data_processing.conftest import load_fixture
 
 class TestEnergyDataConverter:

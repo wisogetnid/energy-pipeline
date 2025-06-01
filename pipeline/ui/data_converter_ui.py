@@ -4,7 +4,7 @@ import os
 import glob
 
 from pipeline.ui.base_ui import BaseUI
-from pipeline.data_processing.energy_data_converter import EnergyDataConverter
+from pipeline.data_processing.jsonl_converter import EnergyDataConverter
 
 class DataConverterUI(BaseUI):
     
