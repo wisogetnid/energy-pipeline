@@ -113,32 +113,37 @@ class MenuUI(BaseUI):
                             if self.last_parquet_file:
                                 print("\nNow generating visualizations...")
                                 
-                                # Get complementary file if needed for visualization
-                                resource_name = self.last_parquet_file.split("/")[-1].split("_")[0]
-                                date_part = "_".join(self.last_parquet_file.split("/")[-1].split("_")[2:])
-                                
-                                complementary_type = "cost" if "consumption" in self.last_parquet_file else "consumption"
-                                complementary_file = f"{resource_name}_{complementary_type}_{date_part}"
-                                
-                                from pathlib import Path
-                                parquet_dir = Path(self.last_parquet_file).parent
-                                complementary_path = parquet_dir / complementary_file
-                                
-                                if complementary_path.exists():
-                                    from pipeline.visualisation.visualisation import generate_visualizations
-                                    vis_result = generate_visualizations(
-                                        self.last_parquet_file if "cost" in self.last_parquet_file else complementary_path,
-                                        self.last_parquet_file if "consumption" in self.last_parquet_file else complementary_path
-                                    )
+                                if "consumption" in self.last_parquet_file:
+                                    consumption_file = self.last_parquet_file
                                     
-                                    if vis_result:
+                                    # Generate efficiency visualizations
+                                    from pipeline.data_visualisation.energy_efficiency import load_and_process_consumption_data, generate_consumption_patterns, generate_weekly_comparison, generate_weekday_weekend_pattern
+                                    
+                                    try:
+                                        resource_name = Path(consumption_file).stem
+                                        output_dir = Path("data/visualisations") / resource_name
+                                        output_dir.mkdir(parents=True, exist_ok=True)
+                                        
+                                        df, resource_type, unit = load_and_process_consumption_data(consumption_file)
+                                        
+                                        print(f"Generating consumption patterns for {resource_type}...")
+                                        generate_consumption_patterns(df, resource_type, unit, output_dir)
+                                        
+                                        print(f"Generating weekly comparison for {resource_type}...")
+                                        generate_weekly_comparison(df, resource_type, unit, output_dir)
+                                        
+                                        print(f"Generating weekday vs weekend patterns for {resource_type}...")
+                                        generate_weekday_weekend_pattern(df, resource_type, unit, output_dir)
+                                        
                                         print("\nVisualization generation successful!")
-                                    else:
-                                        print("\nVisualization generation failed.")
+                                        print(f"Visualizations saved to {output_dir}")
+                                        
+                                    except Exception as e:
+                                        print(f"\nVisualization generation failed: {str(e)}")
                                 else:
-                                    print(f"\nComplementary file ({complementary_file}) not found.")
-                                    print("Visualizations require both consumption and cost data.")
-                                    print("Please retrieve the complementary data before generating visualizations.")
+                                    print("\nThe last converted file is not consumption data.")
+                                    print("Visualizations require consumption data.")
+                                    print("Please convert consumption data before generating visualizations.")
                                 
                                 print("\nPipeline completed successfully!")
                                 print(f"Original data: {self.last_retrieved_file}")
