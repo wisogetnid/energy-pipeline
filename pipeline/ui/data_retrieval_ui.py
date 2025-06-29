@@ -4,6 +4,7 @@ import os
 import json
 from datetime import datetime, timedelta
 from dateutil import parser
+from pathlib import Path
 
 from pipeline.ui.base_ui import BaseUI
 from pipeline.data_retrieval import GlowmarktClient, get_historical_readings
@@ -25,6 +26,7 @@ class DataRetrievalUI(BaseUI):
         self.timezone_name = "UTC"
         self.date_range = ""
         self.batch_days = 10
+        self.retrieved_filepaths = []
     
     def setup_client(self, username=None, password=None, token=None):
         self.print_header("Glowmarkt API Authentication")
@@ -111,16 +113,68 @@ class DataRetrievalUI(BaseUI):
             
             print(f"{i}. {name} ({classifier}) [{unit}]")
         
-        choice = self.get_int_input("\nSelect a resource: ", 1, len(valid_resources))
-        selected = valid_resources[choice - 1]
+        print(f"{len(valid_resources) + 1}. Fetch ALL resources")
         
-        self.selected_resource_id = selected.get("resourceId")
-        self.selected_resource_name = selected.get("name")
-        self.selected_resource_unit = selected.get("baseUnit")
-        self.selected_resource_classifier = selected.get("classifier")
+        choice = self.get_int_input("\nSelect a resource: ", 1, len(valid_resources) + 1)
         
-        print(f"\nSelected: {self.selected_resource_name} ({self.selected_resource_classifier})")
-        return True
+        if choice <= len(valid_resources):
+            selected = valid_resources[choice - 1]
+            
+            self.selected_resource_id = selected.get("resourceId")
+            self.selected_resource_name = selected.get("name")
+            self.selected_resource_unit = selected.get("baseUnit")
+            self.selected_resource_classifier = selected.get("classifier")
+            
+            print(f"\nSelected: {self.selected_resource_name} ({self.selected_resource_classifier})")
+            return True
+        else:
+            return self._fetch_all_resources(valid_resources)
+    
+    def _fetch_all_resources(self, resources):
+        self.print_header("Fetching All Resources")
+        print(f"Selected {len(resources)} resources to download")
+        
+        if not self.select_time_range():
+            return False
+        
+        self.retrieved_filepaths = []
+        failed_resources = []
+        
+        for i, resource in enumerate(resources, 1):
+            resource_name = resource.get("name", "Unknown")
+            resource_classifier = resource.get("classifier", "Unknown")
+            
+            print(f"\nProcessing resource {i}/{len(resources)}: {resource_name}")
+            
+            self.selected_resource_id = resource.get("resourceId")
+            self.selected_resource_name = resource_name
+            self.selected_resource_unit = resource.get("baseUnit", "Unknown")
+            self.selected_resource_classifier = resource_classifier
+            
+            readings = self.retrieve_data()
+            if readings:
+                self.display_readings(readings)
+                json_filepath = self.save_data(readings)
+                
+                if json_filepath:
+                    self.retrieved_filepaths.append(json_filepath)
+            else:
+                failed_resources.append(resource_name)
+                print(f"Failed to retrieve readings for {resource_name}. Continuing with next resource.")
+        
+        if failed_resources:
+            print("\nFailed to retrieve data for these resources:")
+            for resource_name in failed_resources:
+                print(f"- {resource_name}")
+        
+        if self.retrieved_filepaths:
+            print("\nSuccessfully retrieved data for these resources:")
+            for filepath in self.retrieved_filepaths:
+                print(f"- {Path(filepath).name}")
+            return self.retrieved_filepaths
+        else:
+            print("\nFailed to retrieve any resources.")
+            return False
     
     def select_time_range(self):
         self.print_header("Time Range Selection")
@@ -307,8 +361,12 @@ class DataRetrievalUI(BaseUI):
         if not self.select_entity():
             return
         
-        if not self.select_resource():
+        resource_selection_result = self.select_resource()
+        if not resource_selection_result:
             return
+        
+        if isinstance(resource_selection_result, list):
+            return resource_selection_result[0] if resource_selection_result else None
             
         if not self.select_time_range():
             return
