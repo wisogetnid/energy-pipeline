@@ -5,6 +5,7 @@ from pipeline.ui.data_retrieval_ui import DataRetrievalUI
 from pipeline.ui.data_converter_ui import DataConverterUI
 from pipeline.ui.parquet_converter_ui import ParquetConverterUI
 from pipeline.ui.visualization_ui import VisualizationUI
+from pathlib import Path
 
 class MenuUI(BaseUI):
     
@@ -60,9 +61,19 @@ class MenuUI(BaseUI):
                 
                 if menu_choice == 1:
                     # Retrieve data only
-                    self.last_retrieved_file = self.retrieval_ui.run()
+                    retrieval_result = self.retrieval_ui.run()
                     
-                    if self.last_retrieved_file:
+                    if isinstance(retrieval_result, list):
+                        # Multiple files were retrieved
+                        self.last_retrieved_file = retrieval_result[0]  # Use the first one for the pipeline
+                        print(f"\nSuccessfully retrieved {len(retrieval_result)} resource files:")
+                        for file_path in retrieval_result:
+                            print(f" - {file_path}")
+                        print("\nThe first file will be used for further pipeline steps.")
+                        print("You can convert other files using option 2")
+                    elif retrieval_result:
+                        # Single file was retrieved
+                        self.last_retrieved_file = retrieval_result
                         print(f"\nData successfully retrieved to: {self.last_retrieved_file}")
                         print("You can now convert this data using option 2")
                     
@@ -98,9 +109,77 @@ class MenuUI(BaseUI):
                     # Run complete pipeline
                     print("\nRunning complete pipeline: retrieve → JSONL → Parquet → Visualize")
                     
-                    self.last_retrieved_file = self.retrieval_ui.run()
+                    retrieval_result = self.retrieval_ui.run()
                     
-                    if self.last_retrieved_file:
+                    if isinstance(retrieval_result, list):
+                        # Multiple files were retrieved
+                        print(f"\nSuccessfully retrieved {len(retrieval_result)} resource files:")
+                        for i, file_path in enumerate(retrieval_result):
+                            print(f" - {file_path}")
+                            
+                        # Process each file through the pipeline
+                        processed_files = []
+                        
+                        for i, resource_file in enumerate(retrieval_result, 1):
+                            print(f"\n--- Processing file {i}/{len(retrieval_result)}: {Path(resource_file).name} ---")
+                            
+                            self.last_retrieved_file = resource_file
+                            print("Converting to JSONL format...")
+                            
+                            self.last_jsonl_file = self.converter_ui.convert_to_jsonl(self.last_retrieved_file)
+                            
+                            if self.last_jsonl_file:
+                                print("Converting to Parquet format...")
+                                self.last_parquet_file = self.parquet_ui.convert_to_parquet(self.last_jsonl_file)
+                                
+                                if self.last_parquet_file:
+                                    processed_files.append({
+                                        "original": self.last_retrieved_file,
+                                        "jsonl": self.last_jsonl_file,
+                                        "parquet": self.last_parquet_file
+                                    })
+                                    
+                                    if "consumption" in self.last_parquet_file:
+                                        print("Generating visualizations...")
+                                        
+                                        try:
+                                            from pipeline.data_visualisation.energy_efficiency import load_and_process_consumption_data, generate_consumption_patterns, generate_weekly_comparison, generate_weekday_weekend_pattern
+                                            
+                                            resource_name = Path(self.last_parquet_file).stem
+                                            output_dir = Path("data/visualisations") / resource_name
+                                            output_dir.mkdir(parents=True, exist_ok=True)
+                                            
+                                            df, resource_type, unit = load_and_process_consumption_data(self.last_parquet_file)
+                                            
+                                            print(f"Generating consumption patterns for {resource_type}...")
+                                            generate_consumption_patterns(df, resource_type, unit, output_dir)
+                                            
+                                            print(f"Generating weekly comparison for {resource_type}...")
+                                            generate_weekly_comparison(df, resource_type, unit, output_dir)
+                                            
+                                            print(f"Generating weekday vs weekend patterns for {resource_type}...")
+                                            generate_weekday_weekend_pattern(df, resource_type, unit, output_dir)
+                                            
+                                            print(f"Visualizations saved to {output_dir}")
+                                        except Exception as e:
+                                            print(f"Visualization generation failed: {str(e)}")
+                        
+                        if processed_files:
+                            print("\n--- Pipeline Summary ---")
+                            print(f"Successfully processed {len(processed_files)} out of {len(retrieval_result)} files")
+                            
+                            # Keep the last processed file's info for the pipeline status
+                            if processed_files:
+                                last_processed = processed_files[-1]
+                                self.last_retrieved_file = last_processed["original"]
+                                self.last_jsonl_file = last_processed["jsonl"]
+                                self.last_parquet_file = last_processed["parquet"]
+                        else:
+                            print("\nNo files were successfully processed through the pipeline.")
+                    
+                    elif retrieval_result:
+                        # Original single-file pipeline logic
+                        self.last_retrieved_file = retrieval_result
                         print(f"\nData successfully retrieved to: {self.last_retrieved_file}")
                         print("Now converting to JSONL format...")
                         
@@ -155,7 +234,7 @@ class MenuUI(BaseUI):
                             print("\nJSONL conversion failed. Pipeline could not complete.")
                     else:
                         print("\nData retrieval failed. Pipeline could not complete.")
-                    
+                
                 elif menu_choice == 6:
                     print("\nThank you for using the Energy Data Pipeline!")
                     break

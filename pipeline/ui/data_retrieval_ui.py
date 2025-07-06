@@ -356,7 +356,7 @@ class DataRetrievalUI(BaseUI):
         if not self.client:
             if not self.setup_client():
                 return
-        
+    
         print("\nNote: First virtual entity will be automatically selected.")
         if not self.select_entity():
             return
@@ -365,8 +365,10 @@ class DataRetrievalUI(BaseUI):
         if not resource_selection_result:
             return
         
+        # Modified this part to handle the list of file paths correctly
         if isinstance(resource_selection_result, list):
-            return resource_selection_result[0] if resource_selection_result else None
+            # Return all retrieved file paths, not just the first one
+            return resource_selection_result
             
         if not self.select_time_range():
             return

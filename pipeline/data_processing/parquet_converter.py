@@ -52,11 +52,7 @@ class JsonlToParquetConverter:
         df = pd.DataFrame(data_rows)
         
         # Optimize types for better compression
-        if 'timestamp' in df.columns:
-            df['timestamp'] = pd.to_numeric(df['timestamp'])
-        
-        if 'value' in df.columns:
-            df['value'] = pd.to_numeric(df['value'])
+        self._optimize_numeric_columns(df)
         
         df.to_parquet(
             output_file,
@@ -68,6 +64,22 @@ class JsonlToParquetConverter:
         logger.info(f"File size reduced from {jsonl_path.stat().st_size} bytes to {output_file.stat().st_size} bytes")
         
         return str(output_file)
+    
+    def _optimize_numeric_columns(self, df: pd.DataFrame) -> None:
+        """Convert appropriate columns to numeric types for better compression."""
+        # Standard columns
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_numeric(df['timestamp'])
+        
+        if 'value' in df.columns:
+            df['value'] = pd.to_numeric(df['value'])
+        
+        # Combined file columns
+        if 'consumption_value' in df.columns:
+            df['consumption_value'] = pd.to_numeric(df['consumption_value'], errors='coerce')
+        
+        if 'cost_value' in df.columns:
+            df['cost_value'] = pd.to_numeric(df['cost_value'], errors='coerce')
     
     def convert_batch_to_parquet(
         self,
