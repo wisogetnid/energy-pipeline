@@ -176,76 +176,71 @@ class DataRetrievalUI(BaseUI):
             print("\nFailed to retrieve any resources.")
             return False
     
-    def select_time_range(self):
+    def select_time_range(self, preset=None):
         self.print_header("Time Range Selection")
-        
-        print("Choose a date range:")
-        print("1. Current month")
-        print("2. Previous month")
-        print("3. Two months ago")
-        print("4. Three months ago")
-        print("5. Custom range")
-        
-        choice = self.get_int_input("\nSelect a range: ", 1, 5)
         
         now = datetime.now()
         current_year = now.year
         current_month = now.month
         
+        if preset:
+            # Update preset mapping since we're changing the options
+            choice = {"select_month": 1, "custom": 2}.get(preset, 1)
+        else:
+            print("Choose a date range:")
+            print("1. Select month and year")
+            print("2. Custom range (enter specific dates)")
+            
+            choice = self.get_int_input("\nSelect a range: ", 1, 2)
+        
         if choice == 1:
-            self.start_date = datetime(current_year, current_month, 1)
-            if current_month == 12:
-                self.end_date = datetime(current_year + 1, 1, 1) - timedelta(seconds=1)
-            else:
-                self.end_date = datetime(current_year, current_month + 1, 1) - timedelta(seconds=1)
-            self.date_range = f"current month ({self.start_date.strftime('%B %Y')})"
+            # This is now the "Select month and year" option (previously option 6)
+            try:
+                # Display month selection
+                print("\nSelect month:")
+                month_names = [
+                    "January", "February", "March", "April", 
+                    "May", "June", "July", "August",
+                    "September", "October", "November", "December"
+                ]
+                
+                for i, month_name in enumerate(month_names, 1):
+                    print(f"{i}. {month_name}")
+                
+                month = self.get_int_input("\nEnter month (1-12): ", 1, 12)
+                
+                # Year selection with current year as default
+                print(f"\nEnter year (default: {current_year}):")
+                year_input = input(f"Year [{current_year}]: ")
+                
+                if not year_input.strip():
+                    year = current_year
+                else:
+                    try:
+                        year = int(year_input)
+                        if year < 2000 or year > 2100:
+                            print("Year should be between 2000 and 2100, using current year instead.")
+                            year = current_year
+                    except ValueError:
+                        print("Invalid year format, using current year instead.")
+                        year = current_year
+                
+                # Set start and end dates for the selected month and year
+                self.start_date = datetime(year, month, 1)
+                
+                if month == 12:
+                    self.end_date = datetime(year + 1, 1, 1) - timedelta(seconds=1)
+                else:
+                    self.end_date = datetime(year, month + 1, 1) - timedelta(seconds=1)
+                
+                self.date_range = f"{month_names[month-1]} {year}"
+                
+            except Exception as e:
+                print(f"Error setting month and year: {str(e)}")
+                return False
         
         elif choice == 2:
-            prev_month = current_month - 1
-            prev_year = current_year
-            if prev_month == 0:
-                prev_month = 12
-                prev_year -= 1
-            
-            self.start_date = datetime(prev_year, prev_month, 1)
-            self.end_date = datetime(current_year, current_month, 1) - timedelta(seconds=1)
-            self.date_range = f"previous month ({self.start_date.strftime('%B %Y')})"
-        
-        elif choice == 3:
-            prev_month = current_month - 2
-            prev_year = current_year
-            while prev_month <= 0:
-                prev_month += 12
-                prev_year -= 1
-            
-            next_month = prev_month + 1
-            next_year = prev_year
-            if next_month > 12:
-                next_month = 1
-                next_year += 1
-            
-            self.start_date = datetime(prev_year, prev_month, 1)
-            self.end_date = datetime(next_year, next_month, 1) - timedelta(seconds=1)
-            self.date_range = f"two months ago ({self.start_date.strftime('%B %Y')})"
-        
-        elif choice == 4:
-            prev_month = current_month - 3
-            prev_year = current_year
-            while prev_month <= 0:
-                prev_month += 12
-                prev_year -= 1
-            
-            next_month = prev_month + 1
-            next_year = prev_year
-            if next_month > 12:
-                next_month = 1
-                next_year += 1
-            
-            self.start_date = datetime(prev_year, prev_month, 1)
-            self.end_date = datetime(next_year, next_month, 1) - timedelta(seconds=1)
-            self.date_range = f"three months ago ({self.start_date.strftime('%B %Y')})"
-        
-        elif choice == 5:
+            # This is now the "Custom range" option (previously option 5)
             try:
                 start_input = input("\nEnter start date (YYYY-MM-DD): ")
                 self.start_date = parser.parse(start_input)
@@ -261,14 +256,32 @@ class DataRetrievalUI(BaseUI):
             except Exception as e:
                 print(f"Error parsing dates: {str(e)}")
                 return False
-        
+    
         print(f"\nSelected date range: {self.date_range}")
         return True
     
-    def retrieve_data(self):
+    def retrieve_data(self, skip_if_exists=True):
         self.print_header("Retrieving Data")
         
         try:
+            # Check if data already exists
+            if skip_if_exists:
+                data_dir = os.path.join("data", "glowmarkt_api_raw")
+                resource_name_safe = self.selected_resource_name.lower().replace(" ", "_")
+                start_date_str = self.start_date.strftime("%Y%m%d") if isinstance(self.start_date, datetime) else "unknown"
+                end_date_str = self.end_date.strftime("%Y%m%d") if isinstance(self.end_date, datetime) else "unknown"
+                filename = f"{resource_name_safe}_{start_date_str}_to_{end_date_str}.json"
+                filepath = os.path.join(data_dir, filename)
+                
+                if os.path.exists(filepath):
+                    print(f"Data for {self.selected_resource_name} already exists at {filepath}")
+                    print("Loading existing data instead of retrieving again...")
+                    
+                    with open(filepath, 'r') as f:
+                        data = json.load(f)
+                        if "readings" in data and data["readings"]:
+                            return data["readings"]
+            
             print(f"Fetching data for {self.selected_resource_name} over {self.date_range}...")
             print(f"Using PT30M granularity and UTC timezone...")
             print(f"This may take a while for large date ranges...")
@@ -365,9 +378,7 @@ class DataRetrievalUI(BaseUI):
         if not resource_selection_result:
             return
         
-        # Modified this part to handle the list of file paths correctly
         if isinstance(resource_selection_result, list):
-            # Return all retrieved file paths, not just the first one
             return resource_selection_result
             
         if not self.select_time_range():
@@ -384,3 +395,162 @@ class DataRetrievalUI(BaseUI):
             print("Failed to retrieve readings. Please try again.")
         
         return None
+    
+    def fetch_and_combine_resources(self):
+        if not self.client:
+            print("Error: Client not initialized")
+            return False
+        
+        if not self.selected_entity:
+            if not self.select_entity():
+                return False
+        
+        if not self.select_time_range():
+            return False
+        
+        ve_id = self.selected_entity.get("veId")
+        print(f"\nFetching resources for entity {self.selected_entity.get('name')}...")
+        
+        try:
+            entity_details = self.client.get_virtual_entity_resources(ve_id)
+            resources = entity_details.get("resources", [])
+            
+            if not resources:
+                print("No resources found for this entity.")
+                return False
+            
+            valid_resources = []
+            for resource in resources:
+                name = resource.get("name", "Unknown")
+                classifier = resource.get("classifier", "Unknown")
+                
+                if "consumption" in classifier:
+                    valid_resources.append(resource)
+            
+            if not valid_resources:
+                print("No consumption resources found.")
+                return False
+            
+            print(f"\nFound {len(valid_resources)} consumption resources.")
+            
+            retrieved_files = []
+            failed_resources = []
+            skipped_resources = []
+            
+            # Create a temporary directory specifically for this run's files
+            import tempfile
+            temp_dir = Path(tempfile.mkdtemp(prefix="energy_data_"))
+            print(f"\nCreating temporary directory for data processing: {temp_dir}")
+            
+            # Current date range for naming files
+            start_date_str = self.start_date.strftime("%Y%m%d") if isinstance(self.start_date, datetime) else "unknown"
+            end_date_str = self.end_date.strftime("%Y%m%d") if isinstance(self.end_date, datetime) else "unknown"
+            
+            for i, resource in enumerate(valid_resources, 1):
+                resource_name = resource.get("name", "Unknown")
+                resource_classifier = resource.get("classifier", "Unknown")
+                
+                print(f"\nProcessing resource {i}/{len(valid_resources)}: {resource_name}")
+                
+                self.selected_resource_id = resource.get("resourceId")
+                self.selected_resource_name = resource_name
+                self.selected_resource_unit = resource.get("baseUnit", "Unknown")
+                self.selected_resource_classifier = resource_classifier
+                
+                # First save to the permanent location
+                readings = self.retrieve_data()
+                if readings:
+                    permanent_filepath = self.save_data(readings)
+                    
+                    if permanent_filepath:
+                        # Now copy to our temporary directory for processing just this run's files
+                        resource_name_safe = resource_name.lower().replace(" ", "_")
+                        temp_filename = f"{resource_name_safe}_{start_date_str}_to_{end_date_str}.json"
+                        temp_filepath = temp_dir / temp_filename
+                        
+                        # Copy the data to the temp directory
+                        with open(permanent_filepath, 'r') as src_file, open(temp_filepath, 'w') as dst_file:
+                            dst_file.write(src_file.read())
+                        
+                        retrieved_files.append(str(temp_filepath))
+                else:
+                    failed_resources.append(resource_name)
+                    print(f"Failed to retrieve readings for {resource_name}. Continuing with next resource.")
+            
+            if skipped_resources:
+                print("\nSkipped retrieving data for these resources (already downloaded):")
+                for resource_name in skipped_resources:
+                    print(f"- {resource_name}")
+            
+            if failed_resources:
+                print("\nFailed to retrieve data for these resources:")
+                for resource_name in failed_resources:
+                    print(f"- {resource_name}")
+            
+            if retrieved_files:
+                print("\nSuccessfully retrieved data for resources:")
+                for filepath in retrieved_files:
+                    print(f"- {Path(filepath).name}")
+                
+                print("\nCombining just this run's resources into a single file...")
+                from pipeline.data_processing.jsonl_converter import EnergyDataConverter
+                
+                # Use our temporary directory that only contains files from this run
+                output_dir = Path("data/processed")
+                
+                converter = EnergyDataConverter(output_dir=output_dir)
+                combined_filepath = converter.combine_all_resources_into_single_file(temp_dir)
+                
+                if combined_filepath:
+                    print(f"\nAll resources successfully combined into a single file: {combined_filepath}")
+                    
+                    print("\nConverting combined file to Parquet format...")
+                    from pipeline.data_processing.parquet_converter import JsonlToParquetConverter
+                    
+                    parquet_dir = Path("data/parquet")
+                    parquet_converter = JsonlToParquetConverter(output_dir=str(parquet_dir))
+                    parquet_filepath = parquet_converter.convert_jsonl_to_parquet_file(combined_filepath)
+                    
+                    if parquet_filepath:
+                        print(f"\nSuccessfully converted to Parquet format: {parquet_filepath}")
+                        
+                        # Get the original paths, not the temp ones, for returning
+                        original_paths = []
+                        for temp_path in retrieved_files:
+                            filename = Path(temp_path).name
+                            original_path = os.path.join("data", "glowmarkt_api_raw", filename)
+                            original_paths.append(original_path)
+                        
+                        # Delete the temporary directory
+                        import shutil
+                        shutil.rmtree(temp_dir)
+                        print(f"\nTemporary directory removed: {temp_dir}")
+                        
+                        return [parquet_filepath, combined_filepath, *original_paths]
+                    else:
+                        # Delete the temporary directory
+                        import shutil
+                        shutil.rmtree(temp_dir)
+                        print(f"\nTemporary directory removed: {temp_dir}")
+                        
+                        return [combined_filepath, *original_paths]
+                else:
+                    # Delete the temporary directory
+                    import shutil
+                    shutil.rmtree(temp_dir)
+                    print(f"\nTemporary directory removed: {temp_dir}")
+                    
+                    print("\nFailed to combine resources. Individual files are still available.")
+                    return retrieved_files
+            else:
+                # Delete the temporary directory
+                import shutil
+                shutil.rmtree(temp_dir)
+                print(f"\nTemporary directory removed: {temp_dir}")
+                
+                print("\nNo files were successfully retrieved.")
+                return False
+        
+        except Exception as e:
+            print(f"Error fetching or combining resources: {str(e)}")
+            return False

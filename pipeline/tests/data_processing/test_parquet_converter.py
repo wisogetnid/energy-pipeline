@@ -174,7 +174,7 @@ class TestJsonlToParquetConverter:
     def test_convert_jsonl_to_parquet(self, converter, sample_jsonl_file):
         output_file_path = Path(converter.output_dir) / "test_output.parquet"
         
-        result_path = converter.convert_to_parquet(
+        result_path = converter.convert_jsonl_to_parquet_file(
             sample_jsonl_file, 
             output_file=output_file_path
         )
@@ -193,7 +193,7 @@ class TestJsonlToParquetConverter:
     def test_convert_combined_jsonl_to_parquet(self, converter, combined_jsonl_file):
         output_file_path = Path(converter.output_dir) / "combined_output.parquet"
         
-        result_path = converter.convert_to_parquet(
+        result_path = converter.convert_jsonl_to_parquet_file(
             combined_jsonl_file, 
             output_file=output_file_path
         )
@@ -215,7 +215,7 @@ class TestJsonlToParquetConverter:
         assert first_row["cost_value"] == 0.78773
     
     def test_auto_generated_output_filename(self, converter, sample_jsonl_file):
-        result_path = converter.convert_to_parquet(sample_jsonl_file)
+        result_path = converter.convert_jsonl_to_parquet_file(sample_jsonl_file)
         
         output_file = Path(result_path)
         assert output_file.exists()
@@ -226,7 +226,7 @@ class TestJsonlToParquetConverter:
         assert len(df) > 0
     
     def test_numeric_type_optimization(self, converter, sample_jsonl_file):
-        result_path = converter.convert_to_parquet(sample_jsonl_file)
+        result_path = converter.convert_jsonl_to_parquet_file(sample_jsonl_file)
         
         df = pd.read_parquet(result_path)
         
@@ -234,7 +234,7 @@ class TestJsonlToParquetConverter:
         assert pd.api.types.is_numeric_dtype(df["value"])
     
     def test_numeric_type_optimization_for_combined_data(self, converter, combined_jsonl_file):
-        result_path = converter.convert_to_parquet(combined_jsonl_file)
+        result_path = converter.convert_jsonl_to_parquet_file(combined_jsonl_file)
         
         df = pd.read_parquet(result_path)
         
@@ -243,7 +243,7 @@ class TestJsonlToParquetConverter:
         assert pd.api.types.is_numeric_dtype(df["cost_value"])
     
     def test_batch_conversion_of_multiple_files(self, converter, sample_jsonl_file, alternate_jsonl_file, combined_jsonl_file):
-        output_file_paths = converter.convert_batch_to_parquet([
+        output_file_paths = converter.convert_multiple_jsonl_files([
             str(sample_jsonl_file),
             str(alternate_jsonl_file),
             str(combined_jsonl_file)
@@ -256,7 +256,7 @@ class TestJsonlToParquetConverter:
             assert Path(file_path).suffix == ".parquet"
     
     def test_handles_empty_jsonl_file(self, converter, empty_jsonl_file):
-        result_path = converter.convert_to_parquet(empty_jsonl_file)
+        result_path = converter.convert_jsonl_to_parquet_file(empty_jsonl_file)
         
         assert Path(result_path).exists()
         
@@ -264,7 +264,7 @@ class TestJsonlToParquetConverter:
         assert len(df) == 0
     
     def test_handles_malformed_jsonl_lines(self, converter, malformed_jsonl_file):
-        result_path = converter.convert_to_parquet(malformed_jsonl_file)
+        result_path = converter.convert_jsonl_to_parquet_file(malformed_jsonl_file)
         
         assert Path(result_path).exists()
         
@@ -273,7 +273,7 @@ class TestJsonlToParquetConverter:
         assert "valid" in df.columns
     
     def test_file_size_reduction(self, converter, large_jsonl_file):
-        result_path = converter.convert_to_parquet(str(large_jsonl_file))
+        result_path = converter.convert_jsonl_to_parquet_file(str(large_jsonl_file))
         
         jsonl_size = os.path.getsize(large_jsonl_file)
         parquet_size = os.path.getsize(result_path)
@@ -285,10 +285,10 @@ class TestJsonlToParquetConverter:
     
     def test_raises_error_for_nonexistent_file(self, converter):
         with pytest.raises(FileNotFoundError):
-            converter.convert_to_parquet("non_existent_file.jsonl")
+            converter.convert_jsonl_to_parquet_file("non_existent_file.jsonl")
     
     def test_preserves_all_columns(self, converter, sample_jsonl_file):
-        result_path = converter.convert_to_parquet(sample_jsonl_file)
+        result_path = converter.convert_jsonl_to_parquet_file(sample_jsonl_file)
         
         with open(sample_jsonl_file, 'r') as f:
             first_line = f.readline().strip()
@@ -301,7 +301,7 @@ class TestJsonlToParquetConverter:
                 assert jsonl_columns.issubset(parquet_columns)
     
     def test_preserves_all_columns_for_combined_data(self, converter, combined_jsonl_file):
-        result_path = converter.convert_to_parquet(combined_jsonl_file)
+        result_path = converter.convert_jsonl_to_parquet_file(combined_jsonl_file)
         
         with open(combined_jsonl_file, 'r') as f:
             first_line = f.readline().strip()

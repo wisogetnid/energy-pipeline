@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import os
 import json
 import logging
@@ -15,7 +17,7 @@ class JsonlToParquetConverter:
         self.output_dir = Path(output_dir) if output_dir else Path("data/parquet")
         os.makedirs(self.output_dir, exist_ok=True)
     
-    def convert_to_parquet(
+    def convert_jsonl_to_parquet_file(
         self, 
         jsonl_file: Union[str, Path],
         output_file: Optional[Union[str, Path]] = None
@@ -34,67 +36,72 @@ class JsonlToParquetConverter:
         
         output_file.parent.mkdir(parents=True, exist_ok=True)
         
-        data_rows = []
-        with open(jsonl_path, 'r') as f:
-            for line in f:
+        jsonl_rows = []
+        with open(jsonl_path, 'r') as jsonl_file_handle:
+            for line in jsonl_file_handle:
                 if line.strip():
                     try:
-                        data_rows.append(json.loads(line))
+                        jsonl_rows.append(json.loads(line))
                     except json.JSONDecodeError:
                         logger.warning(f"Skipping invalid JSON line: {line[:50]}...")
         
-        if not data_rows:
+        if not jsonl_rows:
             logger.warning(f"No data found in {jsonl_path}")
-            # Create empty parquet file
             pd.DataFrame().to_parquet(output_file)
             return str(output_file)
         
-        df = pd.DataFrame(data_rows)
+        dataframe = pd.DataFrame(jsonl_rows)
         
-        # Optimize types for better compression
-        self._optimize_numeric_columns(df)
+        self.optimize_dataframe_numeric_types(dataframe)
         
-        df.to_parquet(
+        dataframe.to_parquet(
             output_file,
             compression='snappy',
             index=False
         )
         
-        logger.info(f"Converted {len(df)} records to Parquet format at {output_file}")
-        logger.info(f"File size reduced from {jsonl_path.stat().st_size} bytes to {output_file.stat().st_size} bytes")
+        input_size = jsonl_path.stat().st_size
+        output_size = output_file.stat().st_size
+        logger.info(f"Converted {len(dataframe)} records to Parquet format at {output_file}")
+        logger.info(f"File size reduced from {input_size} bytes to {output_size} bytes")
         
         return str(output_file)
     
-    def _optimize_numeric_columns(self, df: pd.DataFrame) -> None:
-        """Convert appropriate columns to numeric types for better compression."""
-        # Standard columns
-        if 'timestamp' in df.columns:
-            df['timestamp'] = pd.to_numeric(df['timestamp'])
+    def optimize_dataframe_numeric_types(self, dataframe: pd.DataFrame) -> None:
+        if 'timestamp' in dataframe.columns:
+            dataframe['timestamp'] = pd.to_numeric(dataframe['timestamp'])
         
-        if 'value' in df.columns:
-            df['value'] = pd.to_numeric(df['value'])
+        if 'value' in dataframe.columns:
+            dataframe['value'] = pd.to_numeric(dataframe['value'])
         
-        # Combined file columns
-        if 'consumption_value' in df.columns:
-            df['consumption_value'] = pd.to_numeric(df['consumption_value'], errors='coerce')
+        if 'consumption_value' in dataframe.columns:
+            dataframe['consumption_value'] = pd.to_numeric(dataframe['consumption_value'], errors='coerce')
         
-        if 'cost_value' in df.columns:
-            df['cost_value'] = pd.to_numeric(df['cost_value'], errors='coerce')
+        if 'cost_value' in dataframe.columns:
+            dataframe['cost_value'] = pd.to_numeric(dataframe['cost_value'], errors='coerce')
+        
+        resource_types = ['electricity', 'gas', 'water']
+        for resource_type in resource_types:
+            consumption_column = f"{resource_type}_consumption"
+            cost_column = f"{resource_type}_cost"
+            
+            if consumption_column in dataframe.columns:
+                dataframe[consumption_column] = pd.to_numeric(dataframe[consumption_column], errors='coerce')
+            
+            if cost_column in dataframe.columns:
+                dataframe[cost_column] = pd.to_numeric(dataframe[cost_column], errors='coerce')
     
-    def convert_batch_to_parquet(
-        self,
-        file_patterns: List[str]
-    ) -> List[str]:
+    def convert_multiple_jsonl_files(self, file_patterns: List[str]) -> List[str]:
         import glob
         
-        output_files = []
+        converted_files = []
         
         for pattern in file_patterns:
             for input_file in glob.glob(pattern):
                 try:
-                    result = self.convert_to_parquet(input_file)
-                    output_files.append(result)
-                except Exception as e:
-                    logger.error(f"Error converting {input_file}: {str(e)}")
+                    result_file = self.convert_jsonl_to_parquet_file(input_file)
+                    converted_files.append(result_file)
+                except Exception as error:
+                    logger.error(f"Error converting {input_file}: {str(error)}")
         
-        return output_files
+        return converted_files

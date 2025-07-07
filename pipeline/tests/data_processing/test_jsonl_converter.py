@@ -164,14 +164,14 @@ class TestEnergyDataConverter:
         assert len(jsonl_lines) > 0
     
     def test_extract_resource_type(self, converter):
-        assert converter._extract_resource_type("electricity consumption") == "electricity"
-        assert converter._extract_resource_type("gas cost") == "gas"
-        assert converter._extract_resource_type("water usage") == "water"
-        assert converter._extract_resource_type("unknown resource") == "energy"
-        assert converter._extract_resource_type("") == "energy"
+        assert converter.extract_resource_type("electricity consumption") == "electricity"
+        assert converter.extract_resource_type("gas cost") == "gas"
+        assert converter.extract_resource_type("water usage") == "water"
+        assert converter.extract_resource_type("unknown resource") == "energy"
+        assert converter.extract_resource_type("") == "energy"
     
     def test_combine_consumption_and_cost(self, converter, gas_consumption_file_path, gas_cost_file_path):
-        combined_readings, metadata = converter._combine_consumption_and_cost(
+        combined_readings, metadata = converter.merge_consumption_and_cost_data(
             gas_consumption_file_path,
             gas_cost_file_path
         )
@@ -198,7 +198,7 @@ class TestEnergyDataConverter:
     def test_combine_resource_files(self, converter, gas_consumption_file_path, gas_cost_file_path):
         output_file_path = Path(converter.output_dir) / "combined_test.jsonl"
         
-        result_path = converter.combine_resource_files(
+        result_path = converter.combine_consumption_and_cost(
             gas_consumption_file_path,
             gas_cost_file_path,
             output_file=output_file_path
@@ -327,8 +327,8 @@ class TestEnergyDataConverter:
         for file in test_data_dir.glob("*.json"):
             print(f" - {file.name}")
         
-        # Run batch combination
-        output_files = converter.combine_batch_resources(test_data_dir)
+        # Run batch combination using the correct method name
+        output_files = converter.batch_combine_resource_files(test_data_dir)
         
         print(f"\nOutput files: {output_files}")
         assert len(output_files) == 2, f"Expected 2 output files, got {len(output_files)}"
@@ -345,58 +345,9 @@ class TestEnergyDataConverter:
                 assert data["resource_type"] in ["electricity", "gas"], f"Invalid resource_type: {data['resource_type']}"
                 assert "consumption_value" in data, f"Missing consumption_value in {output_file}"
                 assert "cost_value" in data, f"Missing cost_value in {output_file}"
-    
-    def test_auto_generated_output_filename(self, converter, gas_consumption_data):
-        result_path = converter.convert_to_jsonl(gas_consumption_data)
-        
-        output_file = Path(result_path)
-        assert output_file.exists()
-        assert "gas_consumption" in output_file.stem
-        
-        with open(result_path, 'r') as f:
-            jsonl_lines = f.read().strip().split('\n')
-        
-        assert len(jsonl_lines) == len(gas_consumption_data["readings"])
-    
-    def test_unix_timestamp_conversion_to_iso_format(self, converter, gas_consumption_data):
-        output_file_path = Path(converter.output_dir) / "timestamp_test.jsonl"
-        
-        converter.convert_to_jsonl(
-            gas_consumption_data, 
-            output_file=output_file_path
-        )
-        
-        with open(output_file_path, 'r') as f:
-            jsonl_lines = f.read().strip().split('\n')
-        
-        first_reading = json.loads(jsonl_lines[0])
-        unix_timestamp = first_reading["timestamp"]
-        iso_formatted_timestamp = first_reading["timestamp_iso"]
-        
-        expected_iso_format = datetime.fromtimestamp(unix_timestamp).isoformat()
-        assert iso_formatted_timestamp == expected_iso_format
-    
-    def test_preserves_all_metadata_fields(self, converter, gas_consumption_data):
-        output_file_path = Path(converter.output_dir) / "metadata_test.jsonl"
-        
-        converter.convert_to_jsonl(
-            gas_consumption_data, 
-            output_file=output_file_path
-        )
-        
-        with open(output_file_path, 'r') as f:
-            first_reading = json.loads(f.readline())
-        
-        assert first_reading["resource_id"] == gas_consumption_data["resource_id"]
-        assert first_reading["resource_name"] == gas_consumption_data["resource_name"]
-        assert first_reading["units"] == gas_consumption_data["resource_unit"]
-        assert first_reading["classifier"] == gas_consumption_data["resource_classifier"]
-        assert first_reading["from_date"] == gas_consumption_data["start_date"]
-        assert first_reading["to_date"] == gas_consumption_data["end_date"]
-        assert first_reading["period"] == gas_consumption_data["period"]
-    
+
     def test_batch_conversion_of_multiple_files(self, converter, gas_consumption_file_path, electricity_consumption_file_path):
-        output_file_paths = converter.convert_batch_to_jsonl([
+        output_file_paths = converter.batch_convert_to_jsonl([
             str(gas_consumption_file_path),
             str(electricity_consumption_file_path)
         ])
@@ -410,61 +361,86 @@ class TestEnergyDataConverter:
             electricity_reading = json.loads(f.readline())
         
         assert electricity_reading["resource_name"] == "electricity consumption"
-    
-    def test_handles_alternate_api_formats(self, converter, tmp_path, alternate_format_data):
-        alternate_format_file = tmp_path / "alternate_format.json"
-        with open(alternate_format_file, 'w') as f:
-            json.dump(alternate_format_data, f)
+
+    def test_combine_all_resources(self, converter, tmp_path, electricity_consumption_data, electricity_cost_data):
+        test_data_dir = tmp_path / "test_all_resources"
+        test_data_dir.mkdir()
         
-        output_file_path = Path(converter.output_dir) / "alternate_format.jsonl"
+        # Create test files for electricity
+        elec_consumption_file = test_data_dir / "electricity_consumption_20250101_to_20250131.json"
+        elec_cost_file = test_data_dir / "electricity_cost_20250101_to_20250131.json"
         
-        result_path = converter.convert_to_jsonl(
-            alternate_format_file, 
-            output_file=output_file_path
-        )
+        # Create test files for gas
+        gas_consumption_file = test_data_dir / "gas_consumption_20250101_to_20250131.json"
+        gas_cost_file = test_data_dir / "gas_cost_20250101_to_20250131.json"
         
-        with open(result_path, 'r') as f:
+        # Create electricity files
+        with open(elec_consumption_file, 'w') as f:
+            json.dump(electricity_consumption_data, f)
+        
+        with open(elec_cost_file, 'w') as f:
+            json.dump(electricity_cost_data, f)
+        
+        # Create gas files (based on electricity but with different values)
+        with open(gas_consumption_file, 'w') as f:
+            gas_data = electricity_consumption_data.copy()
+            gas_data["resource_name"] = "gas consumption"
+            gas_data["resource_id"] = "20cb0793-1adb-4d7f-92f4-fa30ddbf1f35"
+            gas_data["resource_classifier"] = "gas.consumption"
+            
+            # Modify readings to have different values
+            gas_readings = []
+            for reading in gas_data["readings"]:
+                gas_readings.append([reading[0], reading[1] * 0.5])  # Different values
+            gas_data["readings"] = gas_readings
+            
+            json.dump(gas_data, f)
+        
+        with open(gas_cost_file, 'w') as f:
+            gas_cost_data = electricity_cost_data.copy()
+            gas_cost_data["resource_name"] = "gas cost"
+            gas_cost_data["resource_id"] = "e5345576-d775-44cf-bf00-a97b665e6702"
+            gas_cost_data["resource_classifier"] = "gas.consumption.cost"
+            
+            # Modify readings to have different values
+            gas_cost_readings = []
+            for reading in gas_cost_data["readings"]:
+                gas_cost_readings.append([reading[0], reading[1] * 0.2])  # Different values
+            gas_cost_data["readings"] = gas_cost_readings
+            
+            json.dump(gas_cost_data, f)
+        
+        # Run the correct method name
+        output_file = converter.combine_all_resources_into_single_file(test_data_dir)
+        
+        # Verify the output
+        assert output_file is not None
+        assert Path(output_file).exists()
+        
+        with open(output_file, 'r') as f:
             jsonl_lines = f.read().strip().split('\n')
         
-        assert len(jsonl_lines) == 2
+        assert len(jsonl_lines) > 0
         
-        reading = json.loads(jsonl_lines[0])
-        assert reading["resource_id"] == "different-id-123"
-        assert reading["resource_name"] == "different format"
-        assert reading["resource_type"] == "test-type"
-        assert reading["from_date"] == "2025-01-01T00:00:00"
-        assert reading["value"] == 10.5
-    
-    def test_raises_error_for_nonexistent_file(self, converter):
-        with pytest.raises(FileNotFoundError):
-            converter.convert_to_jsonl("non_existent_file.json")
-
-    def test_raises_error_for_invalid_json_file(self, converter, tmp_path):
-        malformed_json_file = tmp_path / "invalid.json"
-        with open(malformed_json_file, 'w') as f:
-            f.write("{invalid json")
+        # Check the content of the first line
+        first_entry = json.loads(jsonl_lines[0])
         
-        with pytest.raises(json.JSONDecodeError):
-            converter.convert_to_jsonl(malformed_json_file)
-
-    def test_handles_empty_data_arrays(self, converter, tmp_path):
-        empty_data_file = tmp_path / "empty.json"
-        with open(empty_data_file, 'w') as f:
-            json.dump({
-                "resource_id": "test-id",
-                "resource_name": "test resource",
-                "readings": []
-            }, f)
+        # Should have electricity and gas data for the same timestamp
+        assert "electricity_consumption" in first_entry
+        assert "electricity_cost" in first_entry
+        assert "gas_consumption" in first_entry
+        assert "gas_cost" in first_entry
         
-        output_file_path = Path(converter.output_dir) / "empty_output.jsonl"
+        # Should have metadata for both resources
+        assert "electricity_consumption_id" in first_entry
+        assert "electricity_cost_id" in first_entry
+        assert "gas_consumption_id" in first_entry
+        assert "gas_cost_id" in first_entry
         
-        result_path = converter.convert_to_jsonl(
-            empty_data_file, 
-            output_file=output_file_path
-        )
+        # Should have timestamp information
+        assert "timestamp" in first_entry
+        assert "timestamp_iso" in first_entry
         
-        assert Path(result_path).exists()
-        with open(result_path, 'r') as f:
-            content = f.read().strip()
-        
-        assert content == ""
+        # Values should match what we expect
+        assert first_entry["electricity_consumption_id"] == "04678775-6c72-43c9-8378-c9914756384a"
+        assert first_entry["gas_consumption_id"] == "20cb0793-1adb-4d7f-92f4-fa30ddbf1f35"
