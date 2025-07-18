@@ -24,6 +24,16 @@ class BaseUI:
                     print(f"Please enter a number between {min_val} and {max_val}")
             except ValueError:
                 print("Please enter a valid number")
+
+    def get_choice(self, options: dict) -> str:
+        while True:
+            for key, value in options.items():
+                print(f"{key}. {value}")
+            choice = input("\nEnter your choice: ")
+            if choice in options:
+                return choice
+            else:
+                print("Invalid choice. Please try again.")
     
     def get_yes_no_input(self, prompt):
         response = input(f"{prompt} (y/n): ")
