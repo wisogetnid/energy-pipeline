@@ -164,6 +164,30 @@ class TestJsonlToParquetConverter:
         
         return file_path
     
+    @pytest.fixture
+    def yearly_jsonl_file(self, tmp_path):
+        data = [
+            {
+                "date": "2025-05-25",
+                "consumption_total": 15.6,
+                "cost_total": 2.50,
+                "reading_count": 48
+            },
+            {
+                "date": "2025-05-26",
+                "consumption_total": 16.2,
+                "cost_total": 2.60,
+                "reading_count": 48
+            }
+        ]
+
+        file_path = tmp_path / "yearly_summary.jsonl"
+        with open(file_path, 'w') as f:
+            for item in data:
+                f.write(json.dumps(item) + '\n')
+
+        return file_path
+
     def test_constructor_creates_output_directory(self, tmp_path):
         nonexistent_dir_path = tmp_path / "test_parquet_output"
         assert not nonexistent_dir_path.exists()
@@ -314,3 +338,26 @@ class TestJsonlToParquetConverter:
                 assert jsonl_columns.issubset(parquet_columns)
                 assert "consumption_value" in parquet_columns
                 assert "cost_value" in parquet_columns
+
+    def test_convert_yearly_jsonl_to_parquet(self, converter, yearly_jsonl_file):
+        output_file_path = Path(converter.output_dir) / "yearly_summary.parquet"
+
+        result_path = converter.convert_jsonl_to_parquet_file(
+            yearly_jsonl_file,
+            output_file=output_file_path
+        )
+
+        assert result_path == str(output_file_path)
+        assert output_file_path.exists()
+
+        df = pd.read_parquet(output_file_path)
+        assert len(df) == 2
+
+        first_row = df.iloc[0]
+        assert first_row["date"] == "2025-05-25"
+        assert pd.api.types.is_numeric_dtype(first_row["consumption_total"])
+        assert pd.api.types.is_numeric_dtype(first_row["cost_total"])
+        assert pd.api.types.is_numeric_dtype(first_row["reading_count"])
+        assert first_row["consumption_total"] == 15.6
+        assert first_row["cost_total"] == 2.50
+        assert first_row["reading_count"] == 48

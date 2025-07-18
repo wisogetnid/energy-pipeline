@@ -2,9 +2,10 @@
 
 from pathlib import Path
 
-from pipeline.data_processing.yearly_jsonl_converter import YearlyEnergyDataConverter  # Updated import
+from pipeline.data_processing.yearly_jsonl_converter import YearlyEnergyDataConverter
 from pipeline.ui.base_ui import BaseUI
 from pipeline.data_processing.jsonl_converter import EnergyDataConverter
+from pipeline.data_processing.parquet_converter import JsonlToParquetConverter
 
 
 class DataConverterUI(BaseUI):
@@ -98,6 +99,13 @@ class DataConverterUI(BaseUI):
             
             print(f"\nSummary files created for {num_years} years: {', '.join(years_covered)}")
             print(f"Files saved to: {self.output_dir}")
+
+            print("\nConverting yearly JSONL files to Parquet format...")
+            parquet_converter = JsonlToParquetConverter()
+            parquet_files = parquet_converter.convert_multiple_jsonl_files(result)
+            print(f"\nSuccessfully converted {len(parquet_files)} files to Parquet format.")
+            for file in parquet_files:
+                print(f" - {file}")
         
         return result
 

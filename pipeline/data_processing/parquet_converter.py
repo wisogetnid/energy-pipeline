@@ -79,6 +79,15 @@ class JsonlToParquetConverter:
         
         if 'cost_value' in dataframe.columns:
             dataframe['cost_value'] = pd.to_numeric(dataframe['cost_value'], errors='coerce')
+
+        if 'consumption_total' in dataframe.columns:
+            dataframe['consumption_total'] = pd.to_numeric(dataframe['consumption_total'], errors='coerce')
+
+        if 'cost_total' in dataframe.columns:
+            dataframe['cost_total'] = pd.to_numeric(dataframe['cost_total'], errors='coerce')
+
+        if 'reading_count' in dataframe.columns:
+            dataframe['reading_count'] = pd.to_numeric(dataframe['reading_count'], errors='coerce')
         
         resource_types = ['electricity', 'gas', 'water']
         for resource_type in resource_types:
