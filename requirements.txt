@@ -1,4 +1,8 @@
 requests
 pytest
+pandas
+requests
+pyarrow
+fastparquet
 python-dotenv
 python-dateutil
