@@ -3,7 +3,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from pipeline.data_processing.glowmarkt_jsonl_converter import GlowmarktEnergyDataConverter
+from pipeline.data_processing.yearly_jsonl_converter import YearlyEnergyDataConverter  # Updated import
 
 
 def load_fixture(filename):
@@ -12,12 +12,12 @@ def load_fixture(filename):
         return json.load(f)
 
 
-class TestGlowmarktEnergyDataConverter:
+class TestYearlyEnergyDataConverter:  # Changed from TestGlowmarktEnergyDataConverter
 
     @pytest.fixture
     def converter(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            yield GlowmarktEnergyDataConverter(output_dir=temp_dir)
+            yield YearlyEnergyDataConverter(output_dir=temp_dir)  # Updated class name
 
     @pytest.fixture
     def gas_consumption_data(self):
@@ -97,8 +97,8 @@ class TestGlowmarktEnergyDataConverter:
 
         assert len(output_files) == 2
 
-        output_2025 = Path(converter.output_dir) / "2025_glowmarkt_data.jsonl"
-        output_2026 = Path(converter.output_dir) / "2026_glowmarkt_data.jsonl"
+        output_2025 = Path(converter.output_dir) / "2025_energy_data.jsonl"  # Updated filename
+        output_2026 = Path(converter.output_dir) / "2026_energy_data.jsonl"  # Updated filename
 
         assert str(output_2025) in output_files
         assert str(output_2026) in output_files

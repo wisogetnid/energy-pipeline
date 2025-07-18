@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 
-class GlowmarktEnergyDataConverter(EnergyDataConverter):
+class YearlyEnergyDataConverter(EnergyDataConverter):  # Changed from GlowmarktEnergyDataConverter
 
     def __init__(self, output_dir: Optional[str] = None):
         super().__init__(output_dir)
@@ -46,7 +46,7 @@ class GlowmarktEnergyDataConverter(EnergyDataConverter):
 
         output_files = []
         for year, daily_readings in yearly_data.items():
-            output_file = self.output_dir / f"{year}_glowmarkt_data.jsonl"
+            output_file = self.output_dir / f"{year}_energy_data.jsonl"  # Changed filename
             output_files.append(str(output_file))
             with open(output_file, 'w') as f:
                 for day, data in sorted(daily_readings.items()):

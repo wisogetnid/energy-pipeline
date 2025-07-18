@@ -19,6 +19,7 @@ class MenuUI(BaseUI):
         self.last_retrieved_file = None
         self.last_jsonl_file = None
         self.last_parquet_file = None
+        self.last_yearly_files = None
         
         if username or token:
             self.retrieval_ui.setup_client(username, password, token)
@@ -30,6 +31,11 @@ class MenuUI(BaseUI):
             print("All data has been successfully combined into a single file.")
         else:
             print("No combined file created yet.")
+            
+        if self.last_yearly_files:
+            print("\nYearly summary files:")
+            for file in self.last_yearly_files:
+                print(f"- {file}")
         print("----------------------")
     
     def run(self):
@@ -40,9 +46,10 @@ class MenuUI(BaseUI):
                 
                 print("\nWhat would you like to do?")
                 print("1. Fetch and combine all resources into one file")
-                print("2. Exit")
+                print("2. Convert raw data to yearly summaries")
+                print("3. Exit")
                 
-                menu_choice = self.get_int_input("\nEnter your choice: ", 1, 2)
+                menu_choice = self.get_int_input("\nEnter your choice: ", 1, 3)
                 
                 if menu_choice == 1:
                     print("\nFetching and combining all resources...")
@@ -66,6 +73,16 @@ class MenuUI(BaseUI):
                         print("\nFailed to retrieve resources.")
                 
                 elif menu_choice == 2:
+                    print("\nConverting raw data to yearly summaries...")
+                    yearly_files = self.converter_ui.run_yearly_conversion()
+                    
+                    if yearly_files:
+                        print("\nYearly conversion complete.")
+                        self.last_yearly_files = yearly_files
+                    else:
+                        print("\nYearly conversion failed or no data available.")
+                
+                elif menu_choice == 3:
                     print("\nThank you for using the Energy Data Pipeline!")
                     break
                 

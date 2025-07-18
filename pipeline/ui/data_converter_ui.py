@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from pipeline.data_processing.glowmarkt_jsonl_converter import GlowmarktEnergyDataConverter
+from pipeline.data_processing.yearly_jsonl_converter import YearlyEnergyDataConverter  # Updated import
 from pipeline.ui.base_ui import BaseUI
 from pipeline.data_processing.jsonl_converter import EnergyDataConverter
 
@@ -34,9 +34,9 @@ class DataConverterUI(BaseUI):
             print(f"Error combining resources: {str(e)}")
             return None
 
-    def convert_glowmarkt_to_yearly(self, directory=None):
+    def convert_to_yearly(self, directory=None):  # Updated method name
         try:
-            converter = GlowmarktEnergyDataConverter(output_dir=self.output_dir)
+            converter = YearlyEnergyDataConverter(output_dir=self.output_dir)  # Updated class name
             data_dir = Path(directory) if directory else self.data_dir
             file_pairs = converter.find_matching_resource_files(data_dir)
             if not file_pairs:
@@ -49,7 +49,7 @@ class DataConverterUI(BaseUI):
                 print(f" - {file}")
             return output_files
         except Exception as e:
-            print(f"Error converting Glowmarkt data: {str(e)}")
+            print(f"Error converting data to yearly format: {str(e)}")  # Updated error message
             return None
 
     def run(self):
@@ -57,7 +57,7 @@ class DataConverterUI(BaseUI):
 
         menu_options = {
             "1": "Combine all resources into a single JSONL file",
-            "2": "Convert Glowmarkt data to yearly JSONL files",
+            "2": "Convert data to yearly JSONL files",  # Updated menu option
             "3": "Exit"
         }
 
@@ -67,7 +67,7 @@ class DataConverterUI(BaseUI):
             if choice == "1":
                 self.run_combination()
             elif choice == "2":
-                self.run_glowmarkt_conversion()
+                self.run_yearly_conversion()  # Updated method name
             elif choice == "3":
                 break
 
@@ -78,12 +78,28 @@ class DataConverterUI(BaseUI):
             print(f"\nCombining ALL resources from {directory} into a single file...")
             self.combine_all_resources(directory)
 
-    def run_glowmarkt_conversion(self):
-        self.print_header("Convert Glowmarkt to Yearly JSONL")
+    def run_yearly_conversion(self):
+        self.print_header("Convert to Yearly JSONL")
+        
         directory = self.get_directory()
-        if directory:
-            print(f"\nConverting Glowmarkt data from {directory} to yearly JSONL files...")
-            self.convert_glowmarkt_to_yearly(directory)
+        if not directory:
+            return None
+            
+        print(f"\nConverting data from {directory} to yearly JSONL files...")
+        result = self.convert_to_yearly(directory)
+        
+        if result:
+            print("\nYearly conversion complete! The data is now available as yearly summaries.")
+            print("These files can be used for year-over-year comparisons and annual reporting.")
+            
+            # Calculate some basic stats for the user
+            num_years = len(result)
+            years_covered = [Path(file).name.split('_')[0] for file in result]
+            
+            print(f"\nSummary files created for {num_years} years: {', '.join(years_covered)}")
+            print(f"Files saved to: {self.output_dir}")
+        
+        return result
 
     def get_directory(self):
         print("\nWhich directory would you like to process?")
