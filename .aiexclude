@@ -1,0 +1,55 @@
+# Exclude Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Exclude virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Exclude distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Exclude data and output files
+data/
+*.parquet
+*.jsonl
+*.json
+*.csv
+
+# Exclude visualization outputs
+data/visualisations/
+
+# Exclude pytest cache and coverage files
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Exclude environment configuration
+.env
+.env.local
+credentials.json
+
+# Exclude temporary files
+temp/
+tmp/
+*.tmp
+
+# Exclude any IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Exclude OS specific files
+.DS_Store
+Thumbs.db
+
+# Exclude logs
+*.log
+logs/
