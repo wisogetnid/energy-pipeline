@@ -19,6 +19,7 @@ dependencies = [
     "matplotlib",
     "requests",
     "python-dateutil",
+    "fastparquet",
 ]
 
 [project.optional-dependencies]
