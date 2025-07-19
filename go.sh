@@ -7,7 +7,8 @@ set -e
 function show_help {
   echo "Energy Pipeline - Available commands:"
   echo "  ./go                    Show this help message"
-  echo "  ./go install            Install required dependencies"
+  echo "  ./go install            Install project with dependencies from pyproject.toml"
+  echo "  ./go install-dev        Install with development dependencies"
   echo "  ./go run                Run the complete energy pipeline"
   echo "  ./go test               Run all unit tests"
   echo "  ./go test-coverage      Run tests with coverage report"
@@ -21,7 +22,10 @@ function show_help {
 # Main command router
 case "$1" in
   "install")
-    pip install -r requirements.txt
+    pip install -e .
+    ;;
+  "install-dev")
+    pip install -e ".[dev]"
     ;;
   "run")
     python -m pipeline

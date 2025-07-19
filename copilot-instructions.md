@@ -9,15 +9,15 @@ This project is a Python-based data pipeline for retrieving, processing, and vis
 1.  **Python Version:** The project uses Python 3.8 or higher. It is recommended to use a version manager like `asdf` to manage Python versions. The `.tool-versions` file specifies the exact Python version.
 2.  **Virtual Environment:** Use a virtual environment to manage project dependencies. Create a new environment by running:
     ```bash
-    ./go create-env
+    ./go.sh create-env
     ```
     Activate the environment with:
     ```bash
     source .venv/bin/activate
     ```
-3.  **Install Dependencies:** Install the required dependencies from `requirements.txt`:
+3.  **Install Dependencies:** Install the required dependencies from `pyproject.toml`:
     ```bash
-    ./go install
+    ./go.sh install
     ```
 
 ## Running the Application
@@ -25,7 +25,7 @@ This project is a Python-based data pipeline for retrieving, processing, and vis
 The main application can be run using the following command:
 
 ```bash
-./go run
+./go.sh run
 ```
 
 This will launch an interactive command-line interface (CLI) that allows you to choose from various options, such as retrieving data, converting data formats, and visualizing data.
@@ -48,9 +48,11 @@ The `go.sh` script in the root directory provides a convenient way to run common
 
 # Code Style and Conventions
 
--   **Formatting:** The project uses `black` for code formatting. Please run `just format` before committing any changes.
--   **Linting:** `pylint` is used for linting. Run `just lint` to check for any linting errors.
--   **Dependencies:** Project dependencies are managed in `requirements.txt` and `pyproject.toml`. Please keep these files in sync.
+-   **Formatting:** The project uses `black` for code formatting. Please run `./go.sh format` before committing any changes.
+-   **Linting:** `pylint` is used for linting. Run `./go.sh lint` to check for any linting errors.
+-   **Dependencies:** Project dependencies are managed in `pyproject.toml`.
+-   **Testing:** The project uses `pytest` for unit testing. Tests are located in the `tests` directory. Run `./go.sh test` to execute all tests.
+-   **Code Conventions:** Follow PEP 8 guidelines for Python code. Use meaningful variable and function names instead of comments or docstrings.
 
 # Key Components
 
@@ -59,6 +61,5 @@ The `go.sh` script in the root directory provides a convenient way to run common
 -   `pipeline/data_visualisation`: Contains modules for generating charts and visualizations of the energy data.
 -   `pipeline/ui`: Provides the command-line interface for interacting with the pipeline.
 -   `pipeline/tests`: Contains all the unit tests for the project.
--   `justfile`: Defines the commands for managing the project.
+-   `go.sh`: Defines the commands for managing the project.
 -   `pyproject.toml`: Specifies the project metadata and dependencies.
--   `requirements.txt`: Lists the project dependencies.
