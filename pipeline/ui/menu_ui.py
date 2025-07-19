@@ -2,91 +2,111 @@
 
 from pipeline.ui.base_ui import BaseUI
 from pipeline.ui.data_retrieval_ui import DataRetrievalUI
-from pipeline.ui.data_converter_ui import DataConverterUI
-from pipeline.ui.parquet_converter_ui import ParquetConverterUI
-from pathlib import Path
 
 class MenuUI(BaseUI):
     
     def __init__(self, username=None, password=None, token=None):
         super().__init__()
-        self.username = username
-        self.password = password
-        self.token = token
         self.retrieval_ui = DataRetrievalUI()
-        self.converter_ui = DataConverterUI()
-        self.parquet_ui = ParquetConverterUI()
-        self.last_retrieved_file = None
-        self.last_jsonl_file = None
-        self.last_parquet_file = None
-        self.last_yearly_files = None
         
-        if username or token:
-            self.retrieval_ui.setup_client(username, password, token)
+        if username or password or token:
+            self.retrieval_ui.client_type = 'glowmarkt'
+            self.retrieval_ui.setup_glowmarkt_client(username, password, token)
     
-    def show_pipeline_status(self):
-        print("\n--- Pipeline Status ---")
-        if self.last_parquet_file:
-            print(f"Combined resources file: {self.last_parquet_file}")
-            print("All data has been successfully combined into a single file.")
-        else:
-            print("No combined file created yet.")
+    def display_welcome(self):
+        print("\n" + "=" * 80)
+        print("Energy Pipeline - Data Processing Tool".center(80))
+        print("=" * 80)
+        print("\nWelcome to the Energy Pipeline interactive client!")
+        print("This tool helps you fetch and process energy consumption data.")
+        print("\nWhat would you like to do?")
+    
+    def display_menu(self):
+        self.display_welcome()
+        
+        while True:
+            print("\nMain Menu:")
+            print("1. Download energy data from Glowmarkt API")
+            print("2. Process N3rgy CSV files")
+            print("3. Combine existing resources into a single file")
+            print("4. Convert combined file to Parquet")
+            print("5. Run data analysis")
+            print("6. Exit")
             
-        if self.last_yearly_files:
-            print("\nYearly summary files:")
-            for file in self.last_yearly_files:
-                print(f"- {file}")
-        print("----------------------")
+            choice = self.get_int_input("\nEnter choice (1-6): ", 1, 6)
+            
+            if choice == 1:
+                if self.retrieval_ui.client_type != 'glowmarkt':
+                    self.retrieval_ui.client_type = 'glowmarkt'
+                    self.retrieval_ui.setup_glowmarkt_client()
+                
+                result = self.retrieval_ui.run()
+                if result:
+                    print("\nSuccess! Data downloaded successfully.")
+                else:
+                    print("\nOperation failed or was cancelled.")
+                
+                self.wait_for_user()
+                
+            elif choice == 2:
+                if self.retrieval_ui.client_type != 'n3rgy':
+                    self.retrieval_ui.client_type = 'n3rgy'
+                    self.retrieval_ui.setup_n3rgy_client()
+                
+                if self.retrieval_ui.client:
+                    print("\nProcessing N3rgy CSV files...")
+                    json_files = self.retrieval_ui.client.process_all_files(extract_cost=True, combine_to_jsonl=True)
+                    
+                    if json_files:
+                        print(f"\nSuccess! Processed {len(json_files)} files.")
+                        
+                        print("\nProcessed files:")
+                        for file_path in json_files:
+                            print(f"- {file_path}")
+                    else:
+                        print("\nNo files were processed or no CSV files found.")
+                else:
+                    print("\nN3rgy client setup failed.")
+                
+                self.wait_for_user()
+                
+            elif choice == 3:
+                result = self.retrieval_ui.fetch_and_combine_resources()
+                if result:
+                    if isinstance(result, list):
+                        print(f"\nSuccess! Created {len(result)} files.")
+                    else:
+                        print("\nSuccess! Resources combined successfully.")
+                else:
+                    print("\nOperation failed or was cancelled.")
+                
+                self.wait_for_user()
+                
+            elif choice == 4:
+                from pipeline.ui.parquet_ui import ParquetUI
+                parquet_ui = ParquetUI()
+                result = parquet_ui.run()
+                
+                if result:
+                    print("\nSuccess! Parquet file created successfully.")
+                else:
+                    print("\nOperation failed or was cancelled.")
+                
+                self.wait_for_user()
+                
+            elif choice == 5:
+                from pipeline.ui.analysis_ui import AnalysisUI
+                analysis_ui = AnalysisUI()
+                analysis_ui.run()
+                
+                self.wait_for_user()
+                
+            elif choice == 6:
+                print("\nExiting Energy Pipeline. Goodbye!")
+                break
+    
+    def wait_for_user(self):
+        input("\nPress Enter to continue...")
     
     def run(self):
-        try:
-            while True:
-                self.print_header("Energy Data Pipeline")
-                self.show_pipeline_status()
-                
-                print("\nWhat would you like to do?")
-                print("1. Fetch and combine all resources into one file")
-                print("2. Convert raw data to yearly summaries")
-                print("3. Exit")
-                
-                menu_choice = self.get_int_input("\nEnter your choice: ", 1, 3)
-                
-                if menu_choice == 1:
-                    print("\nFetching and combining all resources...")
-                    retrieval_result = self.retrieval_ui.fetch_and_combine_resources()
-                    
-                    if isinstance(retrieval_result, list) and len(retrieval_result) > 0:
-                        print("\nResource processing complete.")
-                        print(f"Combined Parquet file: {retrieval_result[0]}")
-                        print(f"Combined JSONL file: {retrieval_result[1]}")
-                        print(f"Individual resource files: {len(retrieval_result) - 2}")
-                        
-                        # Store the combined parquet file as the last processed file
-                        self.last_parquet_file = retrieval_result[0]
-                        self.last_jsonl_file = retrieval_result[1]
-                        self.last_retrieved_file = retrieval_result[2] if len(retrieval_result) > 2 else None
-                    
-                    elif retrieval_result:
-                        print("\nResource retrieval completed, but combination failed.")
-                        print("Individual resource files are available.")
-                    else:
-                        print("\nFailed to retrieve resources.")
-                
-                elif menu_choice == 2:
-                    print("\nConverting raw data to yearly summaries...")
-                    yearly_files = self.converter_ui.run_yearly_conversion()
-                    
-                    if yearly_files:
-                        print("\nYearly conversion complete.")
-                        self.last_yearly_files = yearly_files
-                    else:
-                        print("\nYearly conversion failed or no data available.")
-                
-                elif menu_choice == 3:
-                    print("\nThank you for using the Energy Data Pipeline!")
-                    break
-                
-                input("\nPress Enter to continue...")
-            
-        except Exception as e:
-            print(f"Error in pipeline: {str(e)}")
+        self.display_menu()

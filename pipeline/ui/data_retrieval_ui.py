@@ -8,12 +8,14 @@ from pathlib import Path
 
 from pipeline.ui.base_ui import BaseUI
 from pipeline.data_retrieval import GlowmarktClient, get_historical_readings
+from pipeline.data_retrieval.n3rgy_csv_client import N3rgyCSVClient
 
 class DataRetrievalUI(BaseUI):
     
     def __init__(self, client=None):
         super().__init__()
         self.client = client
+        self.client_type = None  # 'glowmarkt' or 'n3rgy'
         self.selected_entity = None
         self.selected_resource_id = None
         self.selected_resource_name = None
@@ -28,7 +30,23 @@ class DataRetrievalUI(BaseUI):
         self.batch_days = 10
         self.retrieved_filepaths = []
     
-    def setup_client(self, username=None, password=None, token=None):
+    def select_data_source(self):
+        self.print_header("Data Source Selection")
+        
+        print("Choose your data source:")
+        print("1. Glowmarkt API (online)")
+        print("2. N3rgy CSV files (local)")
+        
+        choice = self.get_int_input("\nSelect a source: ", 1, 2)
+        
+        if choice == 1:
+            self.client_type = 'glowmarkt'
+            return self.setup_glowmarkt_client()
+        else:
+            self.client_type = 'n3rgy'
+            return self.setup_n3rgy_client()
+    
+    def setup_glowmarkt_client(self, username=None, password=None, token=None):
         self.print_header("Glowmarkt API Authentication")
         
         self.client = GlowmarktClient(username=username, password=password, token=token)
@@ -44,10 +62,57 @@ class DataRetrievalUI(BaseUI):
                 return False
         return True
     
+    def setup_n3rgy_client(self, source_dir=None, output_dir=None):
+        self.print_header("N3rgy CSV File Setup")
+        
+        # Ask for source directory if not provided
+        if not source_dir:
+            default_source = "./data/n3rgy_raw"
+            source_input = input(f"Enter path to CSV files directory [{default_source}]: ")
+            source_dir = source_input if source_input.strip() else default_source
+        
+        # Ask for output directory if not provided
+        if not output_dir:
+            default_output = "./data/processed"
+            output_input = input(f"Enter path to save processed files [{default_output}]: ")
+            output_dir = output_input if output_input.strip() else default_output
+        
+        # Create the client
+        try:
+            self.client = N3rgyCSVClient(source_dir=source_dir, output_dir=output_dir)
+            
+            # Check if source directory exists and has CSV files
+            source_path = Path(source_dir)
+            if not source_path.exists():
+                print(f"Warning: Source directory {source_dir} does not exist.")
+                create_dir = self.get_yes_no_input("Create the directory now?")
+                if create_dir:
+                    source_path.mkdir(parents=True, exist_ok=True)
+                    print(f"Directory created: {source_dir}")
+                else:
+                    return False
+            
+            csv_files = list(source_path.glob("*.csv"))
+            if not csv_files:
+                print(f"Warning: No CSV files found in {source_dir}")
+                print("Please add CSV files to this directory before proceeding.")
+                return self.get_yes_no_input("Continue anyway?")
+            
+            print(f"Found {len(csv_files)} CSV files in {source_dir}")
+            return True
+            
+        except Exception as e:
+            print(f"Error setting up N3rgy CSV client: {str(e)}")
+            return False
+    
     def select_entity(self):
         if not self.client:
             print("Error: Client not initialized")
             return False
+        
+        # Only applicable for Glowmarkt client
+        if self.client_type != 'glowmarkt':
+            return True
         
         try:
             self.print_header("Virtual Entity Selection")
@@ -71,8 +136,14 @@ class DataRetrievalUI(BaseUI):
             return False
     
     def select_resource(self):
+        if self.client_type == 'glowmarkt':
+            return self._select_glowmarkt_resource()
+        else:
+            return self._select_n3rgy_resource()
+    
+    def _select_glowmarkt_resource(self):
         try:
-            self.print_header("Resource Selection")
+            self.print_header("Resource Selection (Glowmarkt)")
             
             ve_id = self.selected_entity.get("veId")
             print(f"Fetching resources for entity {self.selected_entity.get('name')}...")
@@ -89,6 +160,46 @@ class DataRetrievalUI(BaseUI):
         except Exception as e:
             print(f"Error fetching resources: {str(e)}")
             return False
+    
+    def _select_n3rgy_resource(self):
+        self.print_header("Resource Selection (N3rgy CSV)")
+        
+        # Process all files to generate JSONs
+        json_files = self.client.process_all_files(extract_cost=True, combine_to_jsonl=False)
+        
+        if not json_files:
+            print("No resources found or processing failed.")
+            return False
+        
+        # Group by resource type
+        resources = []
+        resource_ids = set()
+        
+        for json_file in json_files:
+            try:
+                with open(json_file, 'r') as f:
+                    data = json.load(f)
+                    resource_id = data.get('resource_id')
+                    
+                    # Skip if we've already added this resource
+                    if resource_id in resource_ids:
+                        continue
+                    
+                    resource_ids.add(resource_id)
+                    resources.append({
+                        "resourceId": resource_id,
+                        "name": data.get('resource_name', 'Unknown'),
+                        "classifier": data.get('resource_classifier', 'Unknown'),
+                        "baseUnit": data.get('resource_unit', 'Unknown')
+                    })
+            except Exception as e:
+                print(f"Error reading {json_file}: {e}")
+        
+        if not resources:
+            print("No valid resources found in processed files.")
+            return False
+        
+        return self._display_and_select_resource(resources)
     
     def _display_and_select_resource(self, resources):
         print("\nAvailable resources:")
@@ -266,7 +377,7 @@ class DataRetrievalUI(BaseUI):
         try:
             # Check if data already exists
             if skip_if_exists:
-                data_dir = os.path.join("data", "glowmarkt_api_raw")
+                data_dir = self._get_data_directory()
                 resource_name_safe = self.selected_resource_name.lower().replace(" ", "_")
                 start_date_str = self.start_date.strftime("%Y%m%d") if isinstance(self.start_date, datetime) else "unknown"
                 end_date_str = self.end_date.strftime("%Y%m%d") if isinstance(self.end_date, datetime) else "unknown"
@@ -283,23 +394,46 @@ class DataRetrievalUI(BaseUI):
                             return data["readings"]
             
             print(f"Fetching data for {self.selected_resource_name} over {self.date_range}...")
-            print(f"Using PT30M granularity and UTC timezone...")
-            print(f"This may take a while for large date ranges...")
             
-            readings = get_historical_readings(
-                self.client,
-                self.selected_resource_id,
-                self.start_date,
-                self.end_date,
-                period=self.period,
-                offset=self.offset,
-                batch_days=self.batch_days
-            )
+            if self.client_type == 'glowmarkt':
+                print(f"Using PT30M granularity and UTC timezone...")
+                print(f"This may take a while for large date ranges...")
+                
+                readings = get_historical_readings(
+                    self.client,
+                    self.selected_resource_id,
+                    self.start_date,
+                    self.end_date,
+                    period=self.period,
+                    offset=self.offset,
+                    batch_days=self.batch_days
+                )
+            else:  # n3rgy
+                resource_data = self.client.get_resource_data(
+                    self.selected_resource_id,
+                    start_date=self.start_date,
+                    end_date=self.end_date
+                )
+                
+                if resource_data and "readings" in resource_data:
+                    readings = resource_data["readings"]
+                else:
+                    print(f"No data found for {self.selected_resource_name} in the selected date range.")
+                    readings = []
             
             return readings
         except Exception as e:
             print(f"Error retrieving data: {str(e)}")
             return None
+    
+    def _get_data_directory(self):
+        if self.client_type == 'glowmarkt':
+            data_dir = os.path.join("data", "glowmarkt_api_raw")
+        else:  # n3rgy
+            data_dir = os.path.join("data", "n3rgy_processed")
+        
+        os.makedirs(data_dir, exist_ok=True)
+        return data_dir
     
     def display_readings(self, readings):
         if not readings:
@@ -333,8 +467,7 @@ class DataRetrievalUI(BaseUI):
             return None
         
         try:
-            data_dir = os.path.join("data", "glowmarkt_api_raw")
-            os.makedirs(data_dir, exist_ok=True)
+            data_dir = self._get_data_directory()
             
             resource_name_safe = self.selected_resource_name.lower().replace(" ", "_")
             start_date_str = self.start_date.strftime("%Y%m%d") if isinstance(self.start_date, datetime) else "unknown"
@@ -366,13 +499,16 @@ class DataRetrievalUI(BaseUI):
             return None
     
     def run(self):
+        # First select the data source
         if not self.client:
-            if not self.setup_client():
+            if not self.select_data_source():
                 return
-    
-        print("\nNote: First virtual entity will be automatically selected.")
-        if not self.select_entity():
-            return
+        
+        # For Glowmarkt, we need to select an entity
+        if self.client_type == 'glowmarkt':
+            print("\nNote: First virtual entity will be automatically selected.")
+            if not self.select_entity():
+                return
         
         resource_selection_result = self.select_resource()
         if not resource_selection_result:
@@ -397,14 +533,24 @@ class DataRetrievalUI(BaseUI):
         return None
     
     def fetch_and_combine_resources(self):
+        # First select the data source if not already set
         if not self.client:
-            print("Error: Client not initialized")
-            return False
-        
-        if not self.selected_entity:
-            if not self.select_entity():
+            if not self.select_data_source():
                 return False
         
+        # For Glowmarkt, we need to select an entity
+        if self.client_type == 'glowmarkt':
+            if not self.selected_entity:
+                if not self.select_entity():
+                    return False
+            
+            # Continue with Glowmarkt flow
+            return self._fetch_and_combine_glowmarkt_resources()
+        else:
+            # For N3rgy, we can directly process all files
+            return self._fetch_and_combine_n3rgy_resources()
+    
+    def _fetch_and_combine_glowmarkt_resources(self):
         if not self.select_time_range():
             return False
         
@@ -477,80 +623,121 @@ class DataRetrievalUI(BaseUI):
                     failed_resources.append(resource_name)
                     print(f"Failed to retrieve readings for {resource_name}. Continuing with next resource.")
             
-            if skipped_resources:
-                print("\nSkipped retrieving data for these resources (already downloaded):")
-                for resource_name in skipped_resources:
-                    print(f"- {resource_name}")
+            return self._process_combined_files(retrieved_files, failed_resources, skipped_resources, temp_dir)
             
-            if failed_resources:
-                print("\nFailed to retrieve data for these resources:")
-                for resource_name in failed_resources:
-                    print(f"- {resource_name}")
+        except Exception as e:
+            print(f"Error fetching or combining resources: {str(e)}")
+            return False
+    
+    def _fetch_and_combine_n3rgy_resources(self):
+        if not self.select_time_range():
+            return False
+        
+        try:
+            # Process all files and create a combined JSONL
+            print("\nProcessing all N3rgy CSV files...")
             
-            if retrieved_files:
-                print("\nSuccessfully retrieved data for resources:")
-                for filepath in retrieved_files:
-                    print(f"- {Path(filepath).name}")
+            # Create a temp directory for this run's files
+            import tempfile
+            temp_dir = Path(tempfile.mkdtemp(prefix="energy_data_"))
+            
+            # First process all files to JSON
+            json_files = self.client.process_all_files(extract_cost=True, combine_to_jsonl=False)
+            
+            if not json_files:
+                print("No CSV files found or processing failed.")
+                return False
+            
+            # Copy files to temp directory
+            retrieved_files = []
+            for json_file in json_files:
+                temp_filename = Path(json_file).name
+                temp_filepath = temp_dir / temp_filename
                 
-                print("\nCombining just this run's resources into a single file...")
-                from pipeline.data_processing.jsonl_converter import EnergyDataConverter
+                # Copy the data to the temp directory
+                with open(json_file, 'r') as src_file, open(temp_filepath, 'w') as dst_file:
+                    dst_file.write(src_file.read())
                 
-                # Use our temporary directory that only contains files from this run
-                output_dir = Path("data/processed")
+                retrieved_files.append(str(temp_filepath))
+            
+            return self._process_combined_files(retrieved_files, [], [], temp_dir)
+            
+        except Exception as e:
+            print(f"Error processing N3rgy files: {str(e)}")
+            return False
+    
+    def _process_combined_files(self, retrieved_files, failed_resources, skipped_resources, temp_dir):
+        if skipped_resources:
+            print("\nSkipped retrieving data for these resources (already downloaded):")
+            for resource_name in skipped_resources:
+                print(f"- {resource_name}")
+        
+        if failed_resources:
+            print("\nFailed to retrieve data for these resources:")
+            for resource_name in failed_resources:
+                print(f"- {resource_name}")
+        
+        if retrieved_files:
+            print("\nSuccessfully retrieved data for resources:")
+            for filepath in retrieved_files:
+                print(f"- {Path(filepath).name}")
+            
+            print("\nCombining just this run's resources into a single file...")
+            from pipeline.data_processing.jsonl_converter import EnergyDataConverter
+            
+            # Use our temporary directory that only contains files from this run
+            output_dir = Path("data/processed")
+            
+            converter = EnergyDataConverter(output_dir=output_dir)
+            combined_filepath = converter.combine_all_resources_into_single_file(temp_dir)
+            
+            if combined_filepath:
+                print(f"\nAll resources successfully combined into a single file: {combined_filepath}")
                 
-                converter = EnergyDataConverter(output_dir=output_dir)
-                combined_filepath = converter.combine_all_resources_into_single_file(temp_dir)
+                print("\nConverting combined file to Parquet format...")
+                from pipeline.data_processing.parquet_converter import JsonlToParquetConverter
                 
-                if combined_filepath:
-                    print(f"\nAll resources successfully combined into a single file: {combined_filepath}")
+                parquet_dir = Path("data/parquet")
+                parquet_converter = JsonlToParquetConverter(output_dir=str(parquet_dir))
+                parquet_filepath = parquet_converter.convert_jsonl_to_parquet_file(combined_filepath)
+                
+                if parquet_filepath:
+                    print(f"\nSuccessfully converted to Parquet format: {parquet_filepath}")
                     
-                    print("\nConverting combined file to Parquet format...")
-                    from pipeline.data_processing.parquet_converter import JsonlToParquetConverter
+                    # Get the original paths, not the temp ones, for returning
+                    original_paths = []
+                    data_dir = self._get_data_directory()
+                    for temp_path in retrieved_files:
+                        filename = Path(temp_path).name
+                        original_path = os.path.join(data_dir, filename)
+                        original_paths.append(original_path)
                     
-                    parquet_dir = Path("data/parquet")
-                    parquet_converter = JsonlToParquetConverter(output_dir=str(parquet_dir))
-                    parquet_filepath = parquet_converter.convert_jsonl_to_parquet_file(combined_filepath)
+                    # Delete the temporary directory
+                    import shutil
+                    shutil.rmtree(temp_dir)
+                    print(f"\nTemporary directory removed: {temp_dir}")
                     
-                    if parquet_filepath:
-                        print(f"\nSuccessfully converted to Parquet format: {parquet_filepath}")
-                        
-                        # Get the original paths, not the temp ones, for returning
-                        original_paths = []
-                        for temp_path in retrieved_files:
-                            filename = Path(temp_path).name
-                            original_path = os.path.join("data", "glowmarkt_api_raw", filename)
-                            original_paths.append(original_path)
-                        
-                        # Delete the temporary directory
-                        import shutil
-                        shutil.rmtree(temp_dir)
-                        print(f"\nTemporary directory removed: {temp_dir}")
-                        
-                        return [parquet_filepath, combined_filepath, *original_paths]
-                    else:
-                        # Delete the temporary directory
-                        import shutil
-                        shutil.rmtree(temp_dir)
-                        print(f"\nTemporary directory removed: {temp_dir}")
-                        
-                        return [combined_filepath, *original_paths]
+                    return [parquet_filepath, combined_filepath, *original_paths]
                 else:
                     # Delete the temporary directory
                     import shutil
                     shutil.rmtree(temp_dir)
                     print(f"\nTemporary directory removed: {temp_dir}")
                     
-                    print("\nFailed to combine resources. Individual files are still available.")
-                    return retrieved_files
+                    return [combined_filepath, *original_paths]
             else:
                 # Delete the temporary directory
                 import shutil
                 shutil.rmtree(temp_dir)
                 print(f"\nTemporary directory removed: {temp_dir}")
                 
-                print("\nNo files were successfully retrieved.")
-                return False
-        
-        except Exception as e:
-            print(f"Error fetching or combining resources: {str(e)}")
+                print("\nFailed to combine resources. Individual files are still available.")
+                return retrieved_files
+        else:
+            # Delete the temporary directory
+            import shutil
+            shutil.rmtree(temp_dir)
+            print(f"\nTemporary directory removed: {temp_dir}")
+            
+            print("\nNo files were successfully retrieved.")
             return False
