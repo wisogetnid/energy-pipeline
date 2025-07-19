@@ -28,7 +28,6 @@ clean:
     find . -type d -name ".coverage" -exec rm -rf {} +
     rm -rf .coverage
 
-
 # Create a new environment
 create-env:
     python -m venv .venv
