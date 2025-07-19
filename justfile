@@ -14,13 +14,6 @@ run:
 test:
     pytest pipeline/tests
 
-# Run specific test modules
-test-data-processing:
-    pytest pipeline/tests/data_processing
-
-test-data-retrieval:
-    pytest pipeline/tests/data_retrieval
-
 # Run tests with coverage report
 test-coverage:
     pytest --cov=pipeline pipeline/tests --cov-report=term
@@ -34,23 +27,6 @@ clean:
     find . -type d -name ".pytest_cache" -exec rm -rf {} +
     find . -type d -name ".coverage" -exec rm -rf {} +
     rm -rf .coverage
-
-# Run specific pipeline components
-retrieve-data:
-    python -c "from pipeline.ui.data_retrieval_ui import DataRetrievalUI; DataRetrievalUI().run()"
-
-convert-to-jsonl:
-    python -c "from pipeline.ui.data_converter_ui import DataConverterUI; DataConverterUI().run()"
-
-convert-to-parquet:
-    python -c "from pipeline.ui.parquet_converter_ui import ParquetConverterUI; ParquetConverterUI().run()"
-
-visualize:
-    python -c "from pipeline.ui.visualization_ui import VisualizationUI; VisualizationUI().run()"
-
-# Run visualizations on all data
-visualize-all:
-    python -c "from pipeline.data_visualisation.energy_efficiency import generate_consumption_visualizations; generate_consumption_visualizations()"
 
 # Create a new environment
 create-env:
@@ -67,7 +43,3 @@ format:
 
 # Run tests and lint code
 check: test lint
-
-# Fetch all resources for a specific date range
-fetch-all-resources month="current":
-    python -c "from pipeline.ui.data_retrieval_ui import DataRetrievalUI; from pipeline.data_retrieval import GlowmarktClient; from pipeline.utils.credentials import get_credentials; username, password, token = get_credentials(); ui = DataRetrievalUI(); ui.setup_client(username, password, token); ui.select_entity(); resources = ui.client.get_virtual_entity_resources(ui.selected_entity.get('veId')).get('resources', []); valid_resources = [r for r in resources if 'consumption' in r.get('classifier', '')]; ui.select_time_range(preset='{{month}}'); [ui._fetch_resource(r) for r in valid_resources];"

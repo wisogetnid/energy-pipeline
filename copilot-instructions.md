@@ -9,7 +9,7 @@ This project is a Python-based data pipeline for retrieving, processing, and vis
 1.  **Python Version:** The project uses Python 3.8 or higher. It is recommended to use a version manager like `asdf` to manage Python versions. The `.tool-versions` file specifies the exact Python version.
 2.  **Virtual Environment:** Use a virtual environment to manage project dependencies. Create a new environment by running:
     ```bash
-    python -m venv .venv
+    ./go create-env
     ```
     Activate the environment with:
     ```bash
@@ -17,7 +17,7 @@ This project is a Python-based data pipeline for retrieving, processing, and vis
     ```
 3.  **Install Dependencies:** Install the required dependencies from `requirements.txt`:
     ```bash
-    pip install -r requirements.txt
+    ./go install
     ```
 
 ## Running the Application
@@ -25,22 +25,26 @@ This project is a Python-based data pipeline for retrieving, processing, and vis
 The main application can be run using the following command:
 
 ```bash
-python -m pipeline
+./go run
 ```
 
 This will launch an interactive command-line interface (CLI) that allows you to choose from various options, such as retrieving data, converting data formats, and visualizing data.
 
 # Available Commands
 
-The `justfile` in the root directory provides a convenient way to run common tasks. Use `just` to see a list of available commands.
+The `go` script in the root directory provides a convenient way to run common tasks. Run go without arguments to see a list of available commands:
 
--   `just install`: Install project dependencies.
--   `just test`: Run all unit tests.
--   `just test-coverage`: Run tests with a coverage report.
--   `just lint`: Lint the codebase using `pylint`.
--   `just format`: Format the code using `black`.
--   `just run`: Run the main energy pipeline.
--   `just clean`: Remove temporary files and directories.
+`./go install` - Install required dependencies
+`./go run` - Run the complete energy pipeline
+`./go test` - Run all unit tests
+`./go test-coverage` - Run tests with coverage report
+`./go clean` - Clean up generated files
+`./go create-env` - Create a new virtual environment
+`./go lint` - Lint code with pylint
+`./go format` - Format code with black
+`./go check` - Run tests and lint code
+
+ You might need to execute `chmod +x go` to make the `go` script executable.
 
 # Code Style and Conventions
 

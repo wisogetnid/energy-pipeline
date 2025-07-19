@@ -1,50 +1,5 @@
 # Inconsistencies and Suggested Improvements
 
-## Dependency Management
-
-The project has dependencies listed in both `requirements.txt` and `pyproject.toml`. This can lead to inconsistencies.
-
--   **`requirements.txt`:**
-    ```
-    requests
-    pytest
-    pandas
-    requests
-    pyarrow
-    fastparquet
-    python-dotenv
-    python-dateutil
-    ```
--   **`pyproject.toml`:**
-    ```toml
-    dependencies = [
-        "pandas",
-        "pyarrow",
-        "python-dotenv",
-        "matplotlib",
-        "requests",
-        "python-dateutil",
-    ]
-    [project.optional-dependencies]
-    dev = [
-        "pytest",
-        "pytest-cov",
-    ]
-    ```
-
-**Inconsistencies:**
-
--   `requests` is listed twice in `requirements.txt`.
--   `fastparquet` is in `requirements.txt` but not in `pyproject.toml`.
--   `matplotlib` is in `pyproject.toml` but not in `requirements.txt`.
--   `pytest-cov` is a development dependency in `pyproject.toml` but not included in `requirements.txt`.
-
-**Suggested Tasks:**
-
-1.  **Consolidate Dependencies:** Choose a single source of truth for dependencies. Given the use of `pyproject.toml` for project metadata, it is recommended to manage all dependencies there.
-2.  **Remove `requirements.txt`:** Once all dependencies are moved to `pyproject.toml`, delete `requirements.txt` to avoid confusion.
-3.  **Update Installation Instructions:** Modify the documentation to use `pip install .` or `pip install -e .` for installing dependencies from `pyproject.toml`.
-
 ## Code Duplication
 
 There may be opportunities to reduce code duplication in the data visualization scripts. For example, the `visualize-all` command in the `justfile` suggests that similar processing steps are applied to multiple files.
