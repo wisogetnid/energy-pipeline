@@ -44,6 +44,8 @@ The `go` script in the root directory provides a convenient way to run common ta
 `./go format` - Format code with black
 `./go check` - Run tests and lint code
 
+ You might need to execute `chmod +x go` to make the `go` script executable.
+
 # Code Style and Conventions
 
 -   **Formatting:** The project uses `black` for code formatting. Please run `just format` before committing any changes.
