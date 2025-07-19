@@ -50,7 +50,7 @@ visualize:
 
 # Run visualizations on all data
 visualize-all:
-    python -c "from pipeline.data_visualisation.energy_efficiency import load_and_process_consumption_data, generate_consumption_patterns, generate_weekly_comparison, generate_weekday_weekend_pattern; import glob; from pathlib import Path; output_dir = Path('data/visualisations'); output_dir.mkdir(parents=True, exist_ok=True); [generate_consumption_patterns(*(load_and_process_consumption_data(f)), output_dir / Path(f).stem) and generate_weekly_comparison(*(load_and_process_consumption_data(f)), output_dir / Path(f).stem) and generate_weekday_weekend_pattern(*(load_and_process_consumption_data(f)), output_dir / Path(f).stem) for f in glob.glob('data/processed/*_consumption_*.parquet') or glob.glob('data/processed/*_consumption_*.jsonl')]"
+    python -c "from pipeline.data_visualisation.energy_efficiency import generate_consumption_visualizations; generate_consumption_visualizations()"
 
 # Create a new environment
 create-env:

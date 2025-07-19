@@ -132,6 +132,25 @@ def generate_weekday_weekend_pattern(df, resource_type, consumption_unit, output
     
     return file_path
 
+def generate_all_visualizations(file_path, output_dir):
+    """
+    Generates all visualizations for a given data file.
+    """
+    try:
+        df, resource_type, unit = load_and_process_consumption_data(file_path)
+
+        print(f"Generating patterns for {resource_type} from {Path(file_path).name}")
+
+        pattern_file = generate_consumption_patterns(df, resource_type, unit, output_dir)
+        weekly_file = generate_weekly_comparison(df, resource_type, unit, output_dir)
+        weekday_weekend_file = generate_weekday_weekend_pattern(df, resource_type, unit, output_dir)
+
+        return [pattern_file, weekly_file, weekday_weekend_file]
+
+    except Exception as e:
+        print(f"Error processing {file_path}: {str(e)}")
+        return []
+
 def generate_consumption_visualizations(resource_types=["electricity", "gas"]):
     output_dir = Path("data/visualisations/efficiency")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -146,22 +165,7 @@ def generate_consumption_visualizations(resource_types=["electricity", "gas"]):
             continue
         
         for file_path in consumption_files:
-            try:
-                df, detected_resource, unit = load_and_process_consumption_data(file_path)
-                
-                print(f"Generating patterns for {detected_resource} from {Path(file_path).name}")
-                
-                pattern_file = generate_consumption_patterns(df, detected_resource, unit, output_dir)
-                created_files.append(pattern_file)
-                
-                weekly_file = generate_weekly_comparison(df, detected_resource, unit, output_dir)
-                created_files.append(weekly_file)
-                
-                weekday_weekend_file = generate_weekday_weekend_pattern(df, detected_resource, unit, output_dir)
-                created_files.append(weekday_weekend_file)
-                
-            except Exception as e:
-                print(f"Error processing {file_path}: {str(e)}")
+            created_files.extend(generate_all_visualizations(file_path, output_dir))
     
     if created_files:
         print("\nCreated visualization files:")
