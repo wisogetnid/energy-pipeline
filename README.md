@@ -14,7 +14,7 @@ python env setup, as suggested in a post on [staticnet.io](https://staticnet.io/
 - install python - I propose to use asdf for python version management. Install it, then execute `asdf install` on the root folder (using .tool-versions)
 - use python virtual environments for local dependency management
     - use `source .venv/bin/activate` to start and `deactivate` to stop
-    - install all required packages using `pip install -r requirements.txt`
+    - install all required packages using `pip install .`
 - run tests with `pytest`
 - run the pipeline with `python -m pipeline`
 
