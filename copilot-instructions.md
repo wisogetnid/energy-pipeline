@@ -32,19 +32,19 @@ This will launch an interactive command-line interface (CLI) that allows you to 
 
 # Available Commands
 
-The `go` script in the root directory provides a convenient way to run common tasks. Run go without arguments to see a list of available commands:
+The `go.sh` script in the root directory provides a convenient way to run common tasks. Run go without arguments to see a list of available commands:
 
-`./go install` - Install required dependencies
-`./go run` - Run the complete energy pipeline
-`./go test` - Run all unit tests
-`./go test-coverage` - Run tests with coverage report
-`./go clean` - Clean up generated files
-`./go create-env` - Create a new virtual environment
-`./go lint` - Lint code with pylint
-`./go format` - Format code with black
-`./go check` - Run tests and lint code
+`./go.sh install` - Install required dependencies
+`./go.sh run` - Run the complete energy pipeline
+`./go.sh test` - Run all unit tests
+`./go.sh test-coverage` - Run tests with coverage report
+`./go.sh clean` - Clean up generated files
+`./go.sh create-env` - Create a new virtual environment
+`./go.sh lint` - Lint code with pylint
+`./go.sh format` - Format code with black
+`./go.sh check` - Run tests and lint code
 
- You might need to execute `chmod +x go` to make the `go` script executable.
+ You might need to execute `chmod +x go.sh` to make the `go.sh` script executable.
 
 # Code Style and Conventions
 
