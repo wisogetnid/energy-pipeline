@@ -1,5 +1,3 @@
-
-
 from pipeline.ui.base_ui import BaseUI
 from pipeline.ui.data_retrieval_ui import DataRetrievalUI
 
@@ -27,15 +25,18 @@ class MenuUI(BaseUI):
             print("\nMain Menu:")
             print("1. Retrieve Data")
             print("2. Convert Data")
-            print("3. Exit")
+            print("3. Visualise Data")
+            print("4. Exit")
             
-            choice = self.get_int_input("\nEnter choice (1-3): ", 1, 3)
+            choice = self.get_int_input("\nEnter choice (1-4): ", 1, 4)
             
             if choice == 1:
                 self.retrieve_data_menu()
             elif choice == 2:
                 self.convert_data_menu()
             elif choice == 3:
+                self.visualisation_menu()
+            elif choice == 4:
                 print("\nExiting Energy Pipeline. Goodbye!")
                 break
     
@@ -134,6 +135,15 @@ class MenuUI(BaseUI):
             print("\nOperation failed or was cancelled.")
         
         self.wait_for_user()
+    
+    def visualisation_menu(self):
+        print("\nVisualisation Menu:")
+        print("1. Monthly Consumption/Cost Comparison")
+        print("2. Back to Main Menu")
+        choice = self.get_int_input("\nEnter choice (1-2): ", 1, 2)
+        if choice == 1:
+            from pipeline.ui.visualization_ui import VisualizationUI
+            VisualizationUI().run_monthly_summary_barchart()
     
     def wait_for_user(self):
         input("\nPress Enter to continue...")

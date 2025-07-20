@@ -20,6 +20,7 @@ dependencies = [
     "requests",
     "python-dateutil",
     "fastparquet",
+    "seaborn",
 ]
 
 [project.optional-dependencies]

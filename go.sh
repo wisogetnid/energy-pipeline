@@ -22,10 +22,7 @@ function show_help {
 # Main command router
 case "$1" in
   "install")
-    pip install -e .
-    ;;
-  "install-dev")
-    pip install -e ".[dev]"
+    pip install .
     ;;
   "run")
     python -m pipeline

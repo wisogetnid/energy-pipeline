@@ -1,8 +1,8 @@
-
-
 import os
 import glob
 from pathlib import Path
+import matplotlib.pyplot as plt
+import json
 
 from pipeline.ui.base_ui import BaseUI
 from pipeline.data_visualisation.energy_efficiency import generate_consumption_patterns, generate_weekly_comparison, generate_weekday_weekend_pattern, load_and_process_consumption_data
@@ -100,5 +100,48 @@ class VisualizationUI(BaseUI):
             print(f"Error generating visualizations: {str(e)}")
             return False
     
+    def run_monthly_summary_barchart(self):
+        self.print_header("Monthly Consumption/Cost Comparison")
+        summary_files = sorted(Path("data/processed").glob("*_annual_energy_summary.jsonl"))
+        if not summary_files:
+            print("No annual summary files found in data/processed.")
+            return False
+
+        for summary_file in summary_files:
+            year = summary_file.name.split("_")[0]
+            months = []
+            consumption_totals = []
+            cost_totals = []
+            with open(summary_file, "r") as f:
+                for line in f:
+                    entry = json.loads(line)
+                    if entry.get("data_type") == "monthly_summary":
+                        months.append(entry["month"])
+                        consumption_totals.append(entry["consumption_total"])
+                        cost_totals.append(entry["cost_total"])
+            if not months:
+                print(f"No monthly summary data in {summary_file.name}")
+                continue
+
+            x = range(len(months))
+            fig, ax1 = plt.subplots(figsize=(10, 6))
+            width = 0.35
+            ax1.bar([i - width/2 for i in x], consumption_totals, width, label="Consumption", color="tab:blue")
+            ax1.bar([i + width/2 for i in x], cost_totals, width, label="Cost", color="tab:orange")
+            ax1.set_xlabel("Month")
+            ax1.set_ylabel("Value")
+            ax1.set_title(f"Monthly Consumption and Cost Comparison ({year})")
+            ax1.set_xticks(x)
+            ax1.set_xticklabels(months, rotation=45)
+            ax1.legend()
+            plt.tight_layout()
+            output_dir = Path("data/visualisations") / "monthly_summary"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / f"{year}_monthly_comparison.png"
+            plt.savefig(output_path)
+            plt.close(fig)
+            print(f"Saved monthly comparison chart for {year} to {output_path}")
+        return True
+
     def run(self):
         return self.run_visualization()
