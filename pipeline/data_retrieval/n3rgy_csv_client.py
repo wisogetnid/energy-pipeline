@@ -13,7 +13,7 @@ class N3rgyCSVClient:
     
     def __init__(self, source_dir=None, output_dir=None):
         
-        self.source_dir = Path(source_dir) if source_dir else Path("./raw-csv")
+        self.source_dir = Path(source_dir) if source_dir else Path("./csv")
         self.output_dir = Path(output_dir) if output_dir else Path("./processed")
         
 

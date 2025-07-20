@@ -1,5 +1,3 @@
-
-
 import os
 import json
 from datetime import datetime, timedelta
@@ -68,12 +66,12 @@ class DataRetrievalUI(BaseUI):
         self.print_header("N3rgy CSV File Setup")
         
         if not source_dir:
-            default_source = "./data/n3rgy_raw"
+            default_source = "./data/n3rgy_raw/csv"
             source_input = input(f"Enter path to CSV files directory [{default_source}]: ")
             source_dir = source_input if source_input.strip() else default_source
         
         if not output_dir:
-            default_output = "./data/processed"
+            default_output = "./data/n3rgy_raw"
             output_input = input(f"Enter path to save processed files [{default_output}]: ")
             output_dir = output_input if output_input.strip() else default_output
         
@@ -103,184 +101,116 @@ class DataRetrievalUI(BaseUI):
             print(f"Error setting up N3rgy CSV client: {str(e)}")
             return False
     
+    def ensure_client_initialized(self):
+        """Ensure that the client is initialized and valid."""
+        if not self.client:
+            raise ValueError("Client is not initialized. Please set up the client first.")
+
+        if self.client_type == 'glowmarkt' and not isinstance(self.client, GlowmarktClient):
+            raise TypeError("Client is not a GlowmarktClient instance.")
+
+        if self.client_type == 'n3rgy' and not isinstance(self.client, N3rgyCSVClient):
+            raise TypeError("Client is not an N3rgyCSVClient instance.")
+
     def select_entity(self):
         if not self.client:
-            print("Error: Client not initialized")
-            return False
-        
+            raise ValueError("Client is not initialized")
+
         if self.client_type != 'glowmarkt':
             return True
-        
+
+        if not isinstance(self.client, GlowmarktClient):
+            raise TypeError("Client is not a GlowmarktClient instance.")
+
         try:
             self.print_header("Virtual Entity Selection")
             print("Fetching your virtual entities...")
-            
+
             entities = self.client.get_virtual_entities()
-            
+
             if not entities:
-                print("No virtual entities found for your account.")
-                return False
-            
+                raise ValueError("No virtual entities found for your account.")
+
             self.selected_entity = entities[0]
             entity_name = self.selected_entity.get("name", "Unknown Entity")
             entity_id = self.selected_entity.get("veId", "Unknown ID")
-            
+
             print(f"\nSelected virtual entity: {entity_name} (ID: {entity_id})")
             return True
-            
+
         except Exception as e:
             print(f"Error fetching virtual entities: {str(e)}")
             return False
-    
-    def select_resource(self):
-        if self.client_type == 'glowmarkt':
-            return self._select_glowmarkt_resource()
-        else:
-            return self._select_n3rgy_resource()
-    
+
     def _select_glowmarkt_resource(self):
+        """Automatically fetch and select all resources for Glowmarkt."""
+        self.ensure_client_initialized()
+
+        if not isinstance(self.client, GlowmarktClient):
+            raise TypeError("Client is not a GlowmarktClient instance.")
+
         try:
             self.print_header("Resource Selection (Glowmarkt)")
-            
-            ve_id = self.selected_entity.get("veId")
-            print(f"Fetching resources for entity {self.selected_entity.get('name')}...")
-            
+
+            if not self.selected_entity:
+                raise ValueError("No entity selected. Please select an entity first.")
+
+            ve_id = self.selected_entity.get("veId", None)
+            if not ve_id:
+                raise ValueError("Selected entity does not have a valid ID.")
+
+            print(f"Fetching resources for entity {self.selected_entity.get('name', 'Unknown')}...")
+
             entity_details = self.client.get_virtual_entity_resources(ve_id)
             resources = entity_details.get("resources", [])
-            
+
             if not resources:
                 print("No resources found for this entity.")
-                return False
-            
-            return self._display_and_select_resource(resources)
-            
-        except Exception as e:
-            print(f"Error fetching resources: {str(e)}")
-            return False
-    
+                return []
+
+            print(f"Automatically selecting all {len(resources)} resources.")
+            return resources
+
+        except AttributeError as e:
+            print(f"Error: {str(e)}. Ensure the client and entity are properly initialized.")
+            return []
+
     def _select_n3rgy_resource(self):
-        self.print_header("Resource Selection (N3rgy CSV)")
-        
-        json_files = self.client.process_all_files(extract_cost=True, combine_to_jsonl=False)
-        
-        if not json_files:
-            print("No resources found or processing failed.")
-            return False
-        
-        resources = []
-        resource_ids = set()
-        
-        for json_file in json_files:
-            try:
-                with open(json_file, 'r') as f:
-                    data = json.load(f)
-                    resource_id = data.get('resource_id')
-                    
-                    if resource_id in resource_ids:
-                        continue
-                    
-                    resource_ids.add(resource_id)
-                    resources.append({
-                        "resourceId": resource_id,
-                        "name": data.get('resource_name', 'Unknown'),
-                        "classifier": data.get('resource_classifier', 'Unknown'),
-                        "baseUnit": data.get('resource_unit', 'Unknown')
-                    })
-            except Exception as e:
-                print(f"Error reading {json_file}: {e}")
-        
-        if not resources:
-            print("No valid resources found in processed files.")
-            return False
-        
-        return self._display_and_select_resource(resources)
-    
-    def _display_and_select_resource(self, resources):
-        print("\nAvailable resources:")
-        
-        valid_resources = []
-        for resource in resources:
-            name = resource.get("name", "Unknown")
-            classifier = resource.get("classifier", "Unknown")
-            unit = resource.get("baseUnit", "Unknown")
+        """Automatically fetch all resources for N3rgy."""
+        self.ensure_client_initialized()
+
+        if not isinstance(self.client, N3rgyCSVClient):
+            raise TypeError("Client is not an N3rgyCSVClient instance.")
+
+        try:
+            self.print_header("Resource Selection (N3rgy CSV)")
+            print("Processing all N3rgy CSV files...")
             
-            if "consumption" in classifier:
-                valid_resources.append(resource)
-        
-        if not valid_resources:
-            print("No consumption resources found.")
-            return False
-        
-        for i, resource in enumerate(valid_resources, 1):
-            name = resource.get("name", "Unknown")
-            classifier = resource.get("classifier", "Unknown")
-            unit = resource.get("baseUnit", "Unknown")
-            
-            print(f"{i}. {name} ({classifier}) [{unit}]")
-        
-        print(f"{len(valid_resources) + 1}. Fetch ALL resources")
-        
-        choice = self.get_int_input("\nSelect a resource: ", 1, len(valid_resources) + 1)
-        
-        if choice <= len(valid_resources):
-            selected = valid_resources[choice - 1]
-            
-            self.selected_resource_id = selected.get("resourceId")
-            self.selected_resource_name = selected.get("name")
-            self.selected_resource_unit = selected.get("baseUnit")
-            self.selected_resource_classifier = selected.get("classifier")
-            
-            print(f"\nSelected: {self.selected_resource_name} ({self.selected_resource_classifier})")
-            return True
+            json_files = self.client.process_all_files(extract_cost=True, combine_to_jsonl=False)
+
+            if not json_files:
+                print("No resources found or processing failed.")
+                return []
+
+            print(f"Automatically selecting all {len(json_files)} resources.")
+            return json_files
+        except Exception as e:
+            print(f"Error processing N3rgy files: {str(e)}")
+            return []
+
+    def select_resource(self):
+        """Automatically retrieve all resources based on the client type."""
+        if self.client_type == 'glowmarkt':
+            resources = self._select_glowmarkt_resource()
+        elif self.client_type == 'n3rgy':
+            resources = self._select_n3rgy_resource()
         else:
-            return self._fetch_all_resources(valid_resources)
-    
-    def _fetch_all_resources(self, resources):
-        self.print_header("Fetching All Resources")
-        print(f"Selected {len(resources)} resources to download")
-        
-        if not self.select_time_range():
-            return False
-        
-        self.retrieved_filepaths = []
-        failed_resources = []
-        
-        for i, resource in enumerate(resources, 1):
-            resource_name = resource.get("name", "Unknown")
-            resource_classifier = resource.get("classifier", "Unknown")
-            
-            print(f"\nProcessing resource {i}/{len(resources)}: {resource_name}")
-            
-            self.selected_resource_id = resource.get("resourceId")
-            self.selected_resource_name = resource_name
-            self.selected_resource_unit = resource.get("baseUnit", "Unknown")
-            self.selected_resource_classifier = resource_classifier
-            
-            readings = self.retrieve_data()
-            if readings:
-                self.display_readings(readings)
-                json_filepath = self.save_data(readings)
-                
-                if json_filepath:
-                    self.retrieved_filepaths.append(json_filepath)
-            else:
-                failed_resources.append(resource_name)
-                print(f"Failed to retrieve readings for {resource_name}. Continuing with next resource.")
-        
-        if failed_resources:
-            print("\nFailed to retrieve data for these resources:")
-            for resource_name in failed_resources:
-                print(f"- {resource_name}")
-        
-        if self.retrieved_filepaths:
-            print("\nSuccessfully retrieved data for these resources:")
-            for filepath in self.retrieved_filepaths:
-                print(f"- {Path(filepath).name}")
-            return self.retrieved_filepaths
-        else:
-            print("\nFailed to retrieve any resources.")
-            return False
-    
+            raise ValueError("Unsupported client type.")
+
+        if resources:
+            print(f"Automatically selected {len(resources)} resources.")
+            return resources
+        return []
     def select_time_range(self, preset=None):
         self.print_header("Time Range Selection")
         
@@ -361,64 +291,85 @@ class DataRetrievalUI(BaseUI):
     
     def retrieve_data(self, skip_if_exists=True):
         self.print_header("Retrieving Data")
-        
+
         try:
+            if not self.selected_resource_name:
+                raise ValueError("No resource selected. Please select a resource first.")
+
             if skip_if_exists:
                 data_dir = self._get_data_directory()
-                resource_name_safe = self.selected_resource_name.lower().replace(" ", "_")
+                resource_name_safe = (self.selected_resource_name or "unknown").lower().replace(" ", "_")
                 start_date_str = self.start_date.strftime("%Y%m%d") if isinstance(self.start_date, datetime) else "unknown"
                 end_date_str = self.end_date.strftime("%Y%m%d") if isinstance(self.end_date, datetime) else "unknown"
                 filename = f"{resource_name_safe}_{start_date_str}_to_{end_date_str}.json"
                 filepath = os.path.join(data_dir, filename)
-                
+
                 if os.path.exists(filepath):
                     print(f"Data for {self.selected_resource_name} already exists at {filepath}")
                     print("Loading existing data instead of retrieving again...")
-                    
+
                     with open(filepath, 'r') as f:
                         data = json.load(f)
                         if "readings" in data and data["readings"]:
                             return data["readings"]
-            
+
             print(f"Fetching data for {self.selected_resource_name} over {self.date_range}...")
-            
+
             if self.client_type == 'glowmarkt':
-                print(f"Using PT30M granularity and UTC timezone...")
-                print(f"This may take a while for large date ranges...")
-                
-                readings = get_historical_readings(
-                    self.client,
-                    self.selected_resource_id,
-                    self.start_date,
-                    self.end_date,
-                    period=self.period,
-                    offset=self.offset,
-                    batch_days=self.batch_days
-                )
-            else:
-                resource_data = self.client.get_resource_data(
-                    self.selected_resource_id,
-                    start_date=self.start_date,
-                    end_date=self.end_date
-                )
-                
-                if resource_data and "readings" in resource_data:
-                    readings = resource_data["readings"]
+                if isinstance(self.client, GlowmarktClient):
+                    if not self.selected_resource_id:
+                        raise ValueError("No resource ID selected for Glowmarkt.")
+
+                    if not self.start_date or not self.end_date:
+                        raise ValueError("Start date or end date is not set.")
+
+                    readings = get_historical_readings(
+                        self.client,
+                        self.selected_resource_id,
+                        self.start_date,
+                        self.end_date,
+                        period=self.period,
+                        offset=self.offset,
+                        batch_days=self.batch_days
+                    )
                 else:
-                    print(f"No data found for {self.selected_resource_name} in the selected date range.")
-                    readings = []
-            
+                    raise TypeError("Client is not a GlowmarktClient instance.")
+            elif self.client_type == 'n3rgy':
+                if isinstance(self.client, N3rgyCSVClient):
+                    if not self.selected_resource_id:
+                        raise ValueError("No resource ID selected for N3rgy.")
+
+                    if not self.start_date or not self.end_date:
+                        raise ValueError("Start date or end date is not set.")
+
+                    resource_data = self.client.get_resource_data(
+                        self.selected_resource_id,
+                        start_date=self.start_date,
+                        end_date=self.end_date
+                    )
+
+                    if resource_data and "readings" in resource_data:
+                        readings = resource_data["readings"]
+                    else:
+                        print(f"No data found for {self.selected_resource_name} in the selected date range.")
+                        readings = []
+                else:
+                    raise TypeError("Client is not an N3rgyCSVClient instance.")
+            else:
+                raise ValueError("Unsupported client type.")
+
             return readings
         except Exception as e:
             print(f"Error retrieving data: {str(e)}")
             return None
     
     def _get_data_directory(self):
+        """Ensure the data directory exists and return its path."""
         if self.client_type == 'glowmarkt':
             data_dir = os.path.join("data", "glowmarkt_api_raw")
         else:
             data_dir = os.path.join("data", "n3rgy_processed")
-        
+
         os.makedirs(data_dir, exist_ok=True)
         return data_dir
     
@@ -456,17 +407,20 @@ class DataRetrievalUI(BaseUI):
         try:
             data_dir = self._get_data_directory()
             
-            resource_name_safe = self.selected_resource_name.lower().replace(" ", "_")
+            # Handle potential None values with safe defaults
+            resource_name = self.selected_resource_name or "unknown_resource"
+            resource_name_safe = resource_name.lower().replace(" ", "_")
+            
             start_date_str = self.start_date.strftime("%Y%m%d") if isinstance(self.start_date, datetime) else "unknown"
             end_date_str = self.end_date.strftime("%Y%m%d") if isinstance(self.end_date, datetime) else "unknown"
             filename = f"{resource_name_safe}_{start_date_str}_to_{end_date_str}.json"
             filepath = os.path.join(data_dir, filename)
             
             data = {
-                "resource_id": self.selected_resource_id,
-                "resource_name": self.selected_resource_name,
-                "resource_unit": self.selected_resource_unit,
-                "resource_classifier": self.selected_resource_classifier,
+                "resource_id": self.selected_resource_id or "unknown",
+                "resource_name": resource_name,
+                "resource_unit": self.selected_resource_unit or "unknown",
+                "resource_classifier": self.selected_resource_classifier or "unknown",
                 "start_date": self.start_date.isoformat() if isinstance(self.start_date, datetime) else self.start_date,
                 "end_date": self.end_date.isoformat() if isinstance(self.end_date, datetime) else self.end_date,
                 "period": self.period,
@@ -486,38 +440,88 @@ class DataRetrievalUI(BaseUI):
             return None
     
     def run(self):
-
+        """Main method to run the data retrieval process."""
         if not self.client:
             if not self.select_data_source():
                 return
-        
 
         if self.client_type == 'glowmarkt':
             print("\nNote: First virtual entity will be automatically selected.")
             if not self.select_entity():
                 return
         
-        resource_selection_result = self.select_resource()
-        if not resource_selection_result:
+        # Select all resources
+        resources = self.select_resource()
+        if not resources:
+            print("No resources available or selection failed.")
             return
         
-        if isinstance(resource_selection_result, list):
-            return resource_selection_result
-            
+        # Select time range for all resources
         if not self.select_time_range():
             return
         
-        readings = self.retrieve_data()
-        if readings:
-            self.display_readings(readings)
-            json_filepath = self.save_data(readings)
-            
-            if json_filepath:
-                return json_filepath
-        else:
-            print("Failed to retrieve readings. Please try again.")
+        # Process and download each resource
+        downloaded_filepaths = self._download_all_resources(resources)
         
-        return None
+        if downloaded_filepaths:
+            print(f"\nSuccessfully downloaded {len(downloaded_filepaths)} resources.")
+            return downloaded_filepaths
+        else:
+            print("Failed to download any resources. Please try again.")
+            return None
+    
+    def _download_all_resources(self, resources):
+        """Download data for all resources."""
+        self.print_header("Downloading Resources")
+        
+        downloaded_filepaths = []
+        failed_resources = []
+        
+        for i, resource in enumerate(resources, 1):
+            try:
+                print(f"\nProcessing resource {i}/{len(resources)}...")
+                
+                # Set resource properties based on client type
+                if self.client_type == 'glowmarkt':
+                    self.selected_resource_id = resource.get("resourceId")
+                    self.selected_resource_name = resource.get("name", "Unknown")
+                    self.selected_resource_unit = resource.get("baseUnit", "Unknown")
+                    self.selected_resource_classifier = resource.get("classifier", "Unknown")
+                elif self.client_type == 'n3rgy':
+                    # For N3rgy, the resource is a filepath
+                    self.selected_resource_id = resource
+                    resource_filename = Path(resource).stem
+                    self.selected_resource_name = resource_filename
+                    self.selected_resource_unit = "Unknown"
+                    self.selected_resource_classifier = "Unknown"
+                
+                print(f"Retrieving data for: {self.selected_resource_name}")
+                
+                # Retrieve and save the data
+                readings = self.retrieve_data()
+                if readings:
+                    self.display_readings(readings)
+                    filepath = self.save_data(readings)
+                    if filepath:
+                        downloaded_filepaths.append(filepath)
+                        print(f"Successfully downloaded data for {self.selected_resource_name}")
+                    else:
+                        failed_resources.append(self.selected_resource_name)
+                        print(f"Failed to save data for {self.selected_resource_name}")
+                else:
+                    failed_resources.append(self.selected_resource_name)
+                    print(f"Failed to retrieve data for {self.selected_resource_name}")
+            
+            except Exception as e:
+                failed_resources.append(self.selected_resource_name or f"Resource {i}")
+                print(f"Error processing resource: {str(e)}")
+        
+        if failed_resources:
+            print("\nFailed to download these resources:")
+            for name in failed_resources:
+                print(f"- {name}")
+        
+        return downloaded_filepaths
     
     def fetch_and_combine_resources(self):
         self.print_header("Combine Resources")
@@ -621,13 +625,33 @@ class DataRetrievalUI(BaseUI):
         return self._process_combined_files(retrieved_files, [], [], temp_dir)
     
     def _fetch_and_combine_glowmarkt_resources(self):
+        """Fetch and combine all resources from Glowmarkt."""
+        self.ensure_client_initialized()
+        
+        if not self.selected_entity:
+            if not self.select_entity():
+                return False
+        
         if not self.select_time_range():
             return False
         
-        ve_id = self.selected_entity.get("veId")
-        print(f"\nFetching resources for entity {self.selected_entity.get('name')}...")
-        
         try:
+            if not isinstance(self.client, GlowmarktClient):
+                print("Error: Client is not a GlowmarktClient instance.")
+                return False
+                
+            if not self.selected_entity:
+                print("Error: No entity selected.")
+                return False
+                
+            ve_id = self.selected_entity.get("veId", None)
+            if not ve_id:
+                print("Error: Selected entity does not have a valid ID.")
+                return False
+                
+            entity_name = self.selected_entity.get("name", "Unknown")
+            print(f"\nFetching resources for entity {entity_name}...")
+                
             entity_details = self.client.get_virtual_entity_resources(ve_id)
             resources = entity_details.get("resources", [])
             
@@ -649,81 +673,50 @@ class DataRetrievalUI(BaseUI):
             
             print(f"\nFound {len(valid_resources)} consumption resources.")
             
-            retrieved_files = []
-            failed_resources = []
-            skipped_resources = []
+            # Download all resources using the _download_all_resources method
+            downloaded_filepaths = self._download_all_resources(valid_resources)
             
-
-            temp_dir = Path(tempfile.mkdtemp(prefix="energy_data_"))
-            print(f"\nCreating temporary directory for data processing: {temp_dir}")
-            
-
-            start_date_str = self.start_date.strftime("%Y%m%d") if isinstance(self.start_date, datetime) else "unknown"
-            end_date_str = self.end_date.strftime("%Y%m%d") if isinstance(self.end_date, datetime) else "unknown"
-            
-            for i, resource in enumerate(valid_resources, 1):
-                resource_name = resource.get("name", "Unknown")
-                resource_classifier = resource.get("classifier", "Unknown")
+            if downloaded_filepaths:
+                print(f"\nSuccessfully downloaded {len(downloaded_filepaths)} resources.")
+                return downloaded_filepaths
+            else:
+                print("Failed to download any resources.")
+                return False
                 
-                print(f"\nProcessing resource {i}/{len(valid_resources)}: {resource_name}")
-                
-                self.selected_resource_id = resource.get("resourceId")
-                self.selected_resource_name = resource_name
-                self.selected_resource_unit = resource.get("baseUnit", "Unknown")
-                self.selected_resource_classifier = resource_classifier
-                
-
-                readings = self.retrieve_data()
-                if readings:
-                    permanent_filepath = self.save_data(readings)
-                    
-                    if permanent_filepath:
-
-                        resource_name_safe = resource_name.lower().replace(" ", "_")
-                        temp_filename = f"{resource_name_safe}_{start_date_str}_to_{end_date_str}.json"
-                        temp_filepath = temp_dir / temp_filename
-                        
-
-                        with open(permanent_filepath, 'r') as src_file, open(temp_filepath, 'w') as dst_file:
-                            dst_file.write(src_file.read())
-                        
-                        retrieved_files.append(str(temp_filepath))
-                else:
-                    failed_resources.append(resource_name)
-                    print(f"Failed to retrieve readings for {resource_name}. Continuing with next resource.")
-            
-            return self._process_combined_files(retrieved_files, failed_resources, skipped_resources, temp_dir)
-            
         except Exception as e:
             print(f"Error fetching or combining resources: {str(e)}")
             return False
     
     def _fetch_and_combine_n3rgy_resources(self):
+        """Fetch and combine all resources from N3rgy CSV files."""
+        self.ensure_client_initialized()
+        
+        if not isinstance(self.client, N3rgyCSVClient):
+            print("Error: Client is not an N3rgyCSVClient instance.")
+            return False
+            
         if not self.select_time_range():
             return False
         
         try:
-
             print("\nProcessing all N3rgy CSV files...")
             
-
             import tempfile
             temp_dir = Path(tempfile.mkdtemp(prefix="energy_data_"))
             
-
             json_files = self.client.process_all_files(extract_cost=True, combine_to_jsonl=False)
             
             if not json_files:
                 print("No CSV files found or processing failed.")
+                import shutil
+                shutil.rmtree(temp_dir)
                 return False
             
-
             retrieved_files = []
             for json_file in json_files:
                 temp_filename = Path(json_file).name
                 temp_filepath = temp_dir / temp_filename
                 
-
                 with open(json_file, 'r') as src_file, open(temp_filepath, 'w') as dst_file:
                     dst_file.write(src_file.read())
                 
@@ -845,7 +838,7 @@ class DataRetrievalUI(BaseUI):
                         shutil.rmtree(temp_dir)
                         print(f"\nTemporary directory removed: {temp_dir}")
                         
-                        return [combined_filepath, *original_paths]
+                        return [combined_filepath]
             else:
 
                 import shutil
