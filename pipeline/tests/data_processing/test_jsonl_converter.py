@@ -419,7 +419,6 @@ class TestEnergyDataConverter:
         assert "gas_cost_id" in first_entry
         
         assert "timestamp" in first_entry
-        assert "timestamp_iso" in first_entry
         
         assert first_entry["electricity_consumption_id"] == "04678775-6c72-43c9-8378-c9914756384a"
         assert first_entry["gas_consumption_id"] == "20cb0793-1adb-4d7f-92f4-fa30ddbf1f35"

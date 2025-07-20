@@ -1,116 +1,85 @@
 #!/usr/bin/env python
 
-import os
 import json
 import logging
+import os
 from pathlib import Path
-from typing import List, Optional, Union, Dict, Any
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class JsonlToParquetConverter:
     
-    def __init__(self, output_dir: Optional[str] = None):
-        self.output_dir = Path(output_dir) if output_dir else Path("data/parquet")
-        os.makedirs(self.output_dir, exist_ok=True)
+    def __init__(self, output_dir: Union[str, Path] = "data/parquet"):
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
     
-    def convert_jsonl_to_parquet_file(
-        self, 
-        jsonl_file: Union[str, Path],
-        output_file: Optional[Union[str, Path]] = None
-    ) -> str:
+    def convert_jsonl_to_parquet_file(self, jsonl_file: Union[str, Path], output_file: Optional[Union[str, Path]] = None) -> Optional[str]:
         jsonl_path = Path(jsonl_file)
         
         if not jsonl_path.exists():
+            logger.error(f"JSONL file not found: {jsonl_path}")
             raise FileNotFoundError(f"JSONL file not found: {jsonl_path}")
         
-        logger.info(f"Loading JSONL data from {jsonl_path}")
-        
-        if output_file is None:
-            output_file = self.output_dir / f"{jsonl_path.stem}.parquet"
-        else:
-            output_file = Path(output_file)
-        
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        jsonl_rows = []
-        with open(jsonl_path, 'r') as jsonl_file_handle:
-            for line in jsonl_file_handle:
-                if line.strip():
+        try:
+            # Read JSONL file into a pandas DataFrame
+            records = []
+            with open(jsonl_path, 'r') as f:
+                for line in f:
                     try:
-                        jsonl_rows.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON line: {line[:50]}...")
-        
-        if not jsonl_rows:
-            logger.warning(f"No data found in {jsonl_path}")
-            pd.DataFrame().to_parquet(output_file)
+                        record = json.loads(line)
+                        records.append(record)
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Skipping invalid JSON line in {jsonl_path}: {e}")
+                        continue
+            
+            if not records:
+                logger.warning(f"No records found in {jsonl_path}")
+                # Create empty DataFrame to handle empty files gracefully
+                df = pd.DataFrame()
+            else:
+                df = pd.DataFrame(records)
+            
+            # Create output file path
+            if output_file is None:
+                output_file = self.output_dir / f"{jsonl_path.stem}.parquet"
+            else:
+                output_file = Path(output_file)
+            
+            # Ensure output directory exists
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Convert timestamp columns if needed
+            if 'timestamp' in df.columns and df['timestamp'].dtype == 'object':
+                try:
+                    df['timestamp'] = pd.to_numeric(df['timestamp'])
+                except:
+                    pass
+            
+            # Write to Parquet
+            df.to_parquet(output_file, index=False)
+            
+            logger.info(f"Converted {jsonl_path} to Parquet format at {output_file}")
             return str(output_file)
-        
-        dataframe = pd.DataFrame(jsonl_rows)
-        
-        self.optimize_dataframe_numeric_types(dataframe)
-        
-        dataframe.to_parquet(
-            output_file,
-            compression='snappy',
-            index=False
-        )
-        
-        input_size = jsonl_path.stat().st_size
-        output_size = output_file.stat().st_size
-        logger.info(f"Converted {len(dataframe)} records to Parquet format at {output_file}")
-        logger.info(f"File size reduced from {input_size} bytes to {output_size} bytes")
-        
-        return str(output_file)
-    
-    def optimize_dataframe_numeric_types(self, dataframe: pd.DataFrame) -> None:
-        if 'timestamp' in dataframe.columns:
-            dataframe['timestamp'] = pd.to_numeric(dataframe['timestamp'])
-        
-        if 'value' in dataframe.columns:
-            dataframe['value'] = pd.to_numeric(dataframe['value'])
-        
-        if 'consumption_value' in dataframe.columns:
-            dataframe['consumption_value'] = pd.to_numeric(dataframe['consumption_value'], errors='coerce')
-        
-        if 'cost_value' in dataframe.columns:
-            dataframe['cost_value'] = pd.to_numeric(dataframe['cost_value'], errors='coerce')
-
-        if 'consumption_total' in dataframe.columns:
-            dataframe['consumption_total'] = pd.to_numeric(dataframe['consumption_total'], errors='coerce')
-
-        if 'cost_total' in dataframe.columns:
-            dataframe['cost_total'] = pd.to_numeric(dataframe['cost_total'], errors='coerce')
-
-        if 'reading_count' in dataframe.columns:
-            dataframe['reading_count'] = pd.to_numeric(dataframe['reading_count'], errors='coerce')
-        
-        resource_types = ['electricity', 'gas', 'water']
-        for resource_type in resource_types:
-            consumption_column = f"{resource_type}_consumption"
-            cost_column = f"{resource_type}_cost"
             
-            if consumption_column in dataframe.columns:
-                dataframe[consumption_column] = pd.to_numeric(dataframe[consumption_column], errors='coerce')
-            
-            if cost_column in dataframe.columns:
-                dataframe[cost_column] = pd.to_numeric(dataframe[cost_column], errors='coerce')
+        except Exception as e:
+            logger.error(f"Error converting {jsonl_path} to Parquet: {e}")
+            return None
     
-    def convert_multiple_jsonl_files(self, file_patterns: List[str]) -> List[str]:
-        import glob
-        
+    def convert_multiple_jsonl_files(self, jsonl_files: List[Union[str, Path]]) -> List[str]:
         converted_files = []
         
-        for pattern in file_patterns:
-            for input_file in glob.glob(pattern):
-                try:
-                    result_file = self.convert_jsonl_to_parquet_file(input_file)
-                    converted_files.append(result_file)
-                except Exception as error:
-                    logger.error(f"Error converting {input_file}: {str(error)}")
+        for jsonl_file in jsonl_files:
+            try:
+                output_file = self.convert_jsonl_to_parquet_file(jsonl_file)
+                if output_file:
+                    converted_files.append(output_file)
+            except FileNotFoundError:
+                logger.warning(f"Skipping non-existent file: {jsonl_file}")
+            except Exception as e:
+                logger.error(f"Error converting {jsonl_file}: {e}")
         
         return converted_files

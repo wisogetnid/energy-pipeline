@@ -19,94 +19,124 @@ class MenuUI(BaseUI):
         print("=" * 80)
         print("\nWelcome to the Energy Pipeline interactive client!")
         print("This tool helps you fetch and process energy consumption data.")
-        print("\nWhat would you like to do?")
     
-    def display_menu(self):
+    def display_main_menu(self):
         self.display_welcome()
         
         while True:
             print("\nMain Menu:")
-            print("1. Download energy data from Glowmarkt API")
-            print("2. Process N3rgy CSV files")
-            print("3. Combine existing resources into a single file")
-            print("4. Convert combined file to Parquet")
-            print("5. Run data analysis")
-            print("6. Exit")
+            print("1. Retrieve Data")
+            print("2. Convert Data")
+            print("3. Exit")
             
-            choice = self.get_int_input("\nEnter choice (1-6): ", 1, 6)
+            choice = self.get_int_input("\nEnter choice (1-3): ", 1, 3)
             
             if choice == 1:
-                if self.retrieval_ui.client_type != 'glowmarkt':
-                    self.retrieval_ui.client_type = 'glowmarkt'
-                    self.retrieval_ui.setup_glowmarkt_client()
-                
-                result = self.retrieval_ui.run()
-                if result:
-                    print("\nSuccess! Data downloaded successfully.")
-                else:
-                    print("\nOperation failed or was cancelled.")
-                
-                self.wait_for_user()
-                
+                self.retrieve_data_menu()
             elif choice == 2:
-                if self.retrieval_ui.client_type != 'n3rgy':
-                    self.retrieval_ui.client_type = 'n3rgy'
-                    self.retrieval_ui.setup_n3rgy_client()
-                
-                if self.retrieval_ui.client:
-                    print("\nProcessing N3rgy CSV files...")
-                    json_files = self.retrieval_ui.client.process_all_files(extract_cost=True, combine_to_jsonl=True)
-                    
-                    if json_files:
-                        print(f"\nSuccess! Processed {len(json_files)} files.")
-                        
-                        print("\nProcessed files:")
-                        for file_path in json_files:
-                            print(f"- {file_path}")
-                    else:
-                        print("\nNo files were processed or no CSV files found.")
-                else:
-                    print("\nN3rgy client setup failed.")
-                
-                self.wait_for_user()
-                
+                self.convert_data_menu()
             elif choice == 3:
-                result = self.retrieval_ui.fetch_and_combine_resources()
-                if result:
-                    if isinstance(result, list):
-                        print(f"\nSuccess! Created {len(result)} files.")
-                    else:
-                        print("\nSuccess! Resources combined successfully.")
-                else:
-                    print("\nOperation failed or was cancelled.")
-                
-                self.wait_for_user()
-                
-            elif choice == 4:
-                from pipeline.ui.parquet_ui import ParquetUI
-                parquet_ui = ParquetUI()
-                result = parquet_ui.run()
-                
-                if result:
-                    print("\nSuccess! Parquet file created successfully.")
-                else:
-                    print("\nOperation failed or was cancelled.")
-                
-                self.wait_for_user()
-                
-            elif choice == 5:
-                from pipeline.ui.analysis_ui import AnalysisUI
-                analysis_ui = AnalysisUI()
-                analysis_ui.run()
-                
-                self.wait_for_user()
-                
-            elif choice == 6:
                 print("\nExiting Energy Pipeline. Goodbye!")
                 break
+    
+    def retrieve_data_menu(self):
+        self.print_header("Retrieve Data")
+        
+        print("1. Use Glowmarkt Client (online API)")
+        print("2. Use N3rgy CSV Converter (local files)")
+        print("3. Back to Main Menu")
+        
+        choice = self.get_int_input("\nEnter choice (1-3): ", 1, 3)
+        
+        if choice == 1:
+            if self.retrieval_ui.client_type != 'glowmarkt':
+                self.retrieval_ui.client_type = 'glowmarkt'
+                self.retrieval_ui.setup_glowmarkt_client()
+            
+            result = self.retrieval_ui.run()
+            if result:
+                print("\nSuccess! Data downloaded successfully.")
+            else:
+                print("\nOperation failed or was cancelled.")
+            
+            self.wait_for_user()
+            
+        elif choice == 2:
+            if self.retrieval_ui.client_type != 'n3rgy':
+                self.retrieval_ui.client_type = 'n3rgy'
+                self.retrieval_ui.setup_n3rgy_client()
+            
+            if self.retrieval_ui.client:
+                print("\nProcessing N3rgy CSV files...")
+                json_files = self.retrieval_ui.client.process_all_files(extract_cost=True, combine_to_jsonl=True)
+                
+                if json_files:
+                    print(f"\nSuccess! Processed {len(json_files)} files.")
+                    print("\nProcessed files:")
+                    for file_path in json_files:
+                        print(f"- {file_path}")
+                else:
+                    print("\nNo files were processed or no CSV files found.")
+            else:
+                print("\nN3rgy client setup failed.")
+            
+            self.wait_for_user()
+    
+    def convert_data_menu(self):
+        self.print_header("Convert Data")
+        
+        print("1. Combine Raw .json Resources to Monthly .jsonl Files")
+        print("2. Combine Monthly .jsonl Files into Yearly .jsonl Files")
+        print("3. Convert Processed .jsonl Files into .parquet Files")
+        print("4. Back to Main Menu")
+        
+        choice = self.get_int_input("\nEnter choice (1-4): ", 1, 4)
+        
+        if choice == 1:
+            self.combine_to_monthly_files()
+        elif choice == 2:
+            self.combine_to_yearly_files()
+        elif choice == 3:
+            self.convert_to_parquet()
+    
+    def combine_to_monthly_files(self):
+        result = self.retrieval_ui.fetch_and_combine_resources()
+        if result:
+            if isinstance(result, list):
+                print(f"\nSuccess! Created {len(result)} files.")
+            else:
+                print("\nSuccess! Resources combined successfully.")
+        else:
+            print("\nOperation failed or was cancelled.")
+        
+        self.wait_for_user()
+    
+    def combine_to_yearly_files(self):
+        from pipeline.ui.data_converter_ui import DataConverterUI
+        converter_ui = DataConverterUI()
+        result = converter_ui.run_yearly_conversion()
+        
+        if result:
+            print("\nSuccess! Created yearly summary files.")
+        else:
+            print("\nOperation failed or was cancelled.")
+        
+        self.wait_for_user()
+    
+    def convert_to_parquet(self):
+        from pipeline.ui.parquet_ui import ParquetUI
+        parquet_ui = ParquetUI()
+        result = parquet_ui.run()
+        
+        if result:
+            print("\nSuccess! Parquet file(s) created successfully.")
+        else:
+            print("\nOperation failed or was cancelled.")
+        
+        self.wait_for_user()
     
     def wait_for_user(self):
         input("\nPress Enter to continue...")
     
     def run(self):
-        self.display_menu()
+        self.display_main_menu()

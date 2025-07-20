@@ -85,9 +85,28 @@ class DataConverterUI(BaseUI):
         directory = self.get_directory()
         if not directory:
             return None
-            
+        
+        # Find all JSONL files in the directory
+        jsonl_files = list(directory.glob("*.jsonl"))
+        
+        if not jsonl_files:
+            print(f"\nNo JSONL files found in {directory}.")
+            print("You need to combine resources into monthly JSONL files first (Option 1).")
+            return None
+        
+        print(f"\nFound {len(jsonl_files)} JSONL files in {directory}.")
+        print("Files to process:")
+        for file in jsonl_files:
+            print(f" - {file.name}")
+        
         print(f"\nConverting data from {directory} to yearly JSONL files...")
-        result = self.convert_to_yearly(directory)
+        
+        # Create the yearly converter
+        from pipeline.data_processing.yearly_jsonl_converter import YearlyEnergyDataConverter
+        converter = YearlyEnergyDataConverter(output_dir=self.output_dir)
+        
+        # Convert to yearly files
+        result = converter.convert_to_yearly_jsonl(jsonl_files)
         
         if result:
             print("\nYearly conversion complete! The data is now available as yearly summaries.")
@@ -100,12 +119,19 @@ class DataConverterUI(BaseUI):
             print(f"\nSummary files created for {num_years} years: {', '.join(years_covered)}")
             print(f"Files saved to: {self.output_dir}")
 
-            print("\nConverting yearly JSONL files to Parquet format...")
-            parquet_converter = JsonlToParquetConverter()
-            parquet_files = parquet_converter.convert_multiple_jsonl_files(result)
-            print(f"\nSuccessfully converted {len(parquet_files)} files to Parquet format.")
-            for file in parquet_files:
-                print(f" - {file}")
+            # Ask if user wants to convert to Parquet
+            convert_to_parquet = self.get_yes_no_input("\nWould you like to convert these yearly files to Parquet format? (y/n): ")
+            
+            if convert_to_parquet:
+                print("\nConverting yearly JSONL files to Parquet format...")
+                from pipeline.data_processing.parquet_converter import JsonlToParquetConverter
+                parquet_converter = JsonlToParquetConverter()
+                parquet_files = parquet_converter.convert_multiple_jsonl_files(result)
+                
+                if parquet_files:
+                    print(f"\nSuccessfully converted {len(parquet_files)} files to Parquet format:")
+                    for file in parquet_files:
+                        print(f" - {file}")
         
         return result
 

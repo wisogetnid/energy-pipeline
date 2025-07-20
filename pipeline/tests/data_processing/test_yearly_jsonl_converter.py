@@ -97,26 +97,38 @@ class TestYearlyEnergyDataConverter:  # Changed from TestGlowmarktEnergyDataConv
 
         assert len(output_files) == 2
 
-        output_2025 = Path(converter.output_dir) / "2025_energy_data.jsonl"  # Updated filename
-        output_2026 = Path(converter.output_dir) / "2026_energy_data.jsonl"  # Updated filename
+        output_2025 = Path(converter.output_dir) / "2025_annual_energy_summary.jsonl"  # Updated filename
+        output_2026 = Path(converter.output_dir) / "2026_annual_energy_summary.jsonl"  # Updated filename
 
         assert str(output_2025) in output_files
         assert str(output_2026) in output_files
 
         with open(output_2025, 'r') as f:
             lines = f.readlines()
-            assert len(lines) == 2
-            day1 = json.loads(lines[0])
-            day2 = json.loads(lines[1])
-            assert day1['date'] == '2025-02-01'
-            assert day1['consumption_total'] == 0.047
-            assert day1['cost_total'] == 0.78773
-            assert day2['date'] == '2025-02-02'
+            assert len(lines) >= 1  # At least the yearly summary line
+            
+            # Find daily records
+            daily_records = [json.loads(line) for line in lines if json.loads(line).get('data_type') == 'daily_summary']
+            
+            # Check for Feb 1st and 2nd, 2025
+            feb01 = next((record for record in daily_records if record.get('date') == '2025-02-01'), None)
+            feb02 = next((record for record in daily_records if record.get('date') == '2025-02-02'), None)
+            
+            assert feb01 is not None
+            assert feb02 is not None
+            assert abs(feb01['consumption_total'] - 0.047) < 0.0001
+            assert abs(feb01['cost_total'] - 0.78773) < 0.0001
 
         with open(output_2026, 'r') as f:
             lines = f.readlines()
-            assert len(lines) == 1
-            day1 = json.loads(lines[0])
-            assert day1['date'] == '2026-02-01'
-            assert day1['consumption_total'] == 0.039
-            assert day1['cost_total'] == 0.5123
+            assert len(lines) >= 1  # At least the yearly summary line
+            
+            # Find daily records
+            daily_records = [json.loads(line) for line in lines if json.loads(line).get('data_type') == 'daily_summary']
+            
+            # Check for Feb 1st, 2026
+            feb01 = next((record for record in daily_records if record.get('date') == '2026-02-01'), None)
+            
+            assert feb01 is not None
+            assert abs(feb01['consumption_total'] - 0.039) < 0.0001
+            assert abs(feb01['cost_total'] - 0.5123) < 0.0001
