@@ -51,7 +51,7 @@ class TestN3rgyCSVClient(unittest.TestCase):
 
     def test_initialization(self):
         client = N3rgyCSVClient()
-        self.assertEqual(client.source_dir, Path("./raw-csv"))
+        self.assertEqual(client.source_dir, Path("./csv"))
         self.assertEqual(client.output_dir, Path("./processed"))
         
         client = N3rgyCSVClient(source_dir="source", output_dir="output")
