@@ -6,32 +6,32 @@ set -e
 # List available commands
 function show_help {
   echo "Energy Pipeline - Available commands:"
-  echo "  ./go                    Show this help message"
-  echo "  ./go install            Install project with dependencies from pyproject.toml"
-  echo "  ./go install-dev        Install with development dependencies"
-  echo "  ./go run                Run the complete energy pipeline"
-  echo "  ./go test               Run all unit tests"
-  echo "  ./go test-coverage      Run tests with coverage report"
-  echo "  ./go clean              Clean up generated files"
-  echo "  ./go create-env         Create a new virtual environment"
-  echo "  ./go lint               Lint code with pylint"
-  echo "  ./go format             Format code with black"
-  echo "  ./go check              Run tests and lint code"
+  echo "  ./go.sh                    Show this help message"
+  echo "  ./go.sh install            Install project with dependencies using uv"
+  echo "  ./go.sh run                Run the complete energy pipeline"
+  echo "  ./go.sh test               Run all unit tests"
+  echo "  ./go.sh test-coverage      Run tests with coverage report"
+  echo "  ./go.sh clean              Clean up generated files"
+  echo "  ./go.sh create-env         Create a new virtual environment"
+  echo "  ./go.sh lint               Lint code with pylint"
+  echo "  ./go.sh format             Format code with black"
+  echo "  ./go.sh check              Run tests and lint code"
 }
 
 # Main command router
 case "$1" in
   "install")
-    pip install .
+    echo "Installing dependencies with uv..."
+    uv sync --dev
     ;;
   "run")
-    python -m pipeline
+    uv run python -m pipeline
     ;;
   "test")
-    pytest pipeline/tests
+    uv run --dev pytest pipeline/tests
     ;;
   "test-coverage")
-    pytest --cov=pipeline pipeline/tests --cov-report=term
+    uv run pytest --cov=pipeline pipeline/tests --cov-report=term
     ;;
   "clean")
     find . -type d -name "__pycache__" -exec rm -rf {} +
@@ -43,18 +43,17 @@ case "$1" in
     rm -rf .coverage
     ;;
   "create-env")
-    python -m venv .venv
-    echo "Run 'source .venv/bin/activate' to activate the environment"
+    echo "uv automatically manages virtual environments. Run './go.sh install' to set up the project."
     ;;
   "lint")
-    pylint pipeline
+    uv run pylint pipeline
     ;;
   "format")
-    black pipeline
+    uv run black pipeline
     ;;
   "check")
-    pytest pipeline/tests
-    pylint pipeline
+    uv run pytest pipeline/tests
+    uv run pylint pipeline
     ;;
   *)
     show_help
