@@ -25,8 +25,7 @@ class TestGlowmarktClientAuth:
     def test_get_readings_auto_authenticates(self, mock_auth_response, sample_resource_id, mock_readings_response):
         client = GlowmarktClient(username="test", password="password", application_id="b0f1b774-a586-4f72-9edd-27ead8aa7a8d")
         
-        with patch("requests.post", return_value=mock_auth_response) as mock_post, \
-             patch("requests.get", return_value=mock_readings_response) as mock_get:
+        with patch("requests.post", return_value=mock_auth_response) as mock_post,             patch("requests.get", return_value=mock_readings_response) as mock_get:
 
             client.get_readings(sample_resource_id)
 

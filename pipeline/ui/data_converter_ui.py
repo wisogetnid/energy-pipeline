@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 
 from pathlib import Path
 
@@ -19,7 +19,7 @@ class DataConverterUI(BaseUI):
         try:
             converter = EnergyDataConverter(output_dir=self.output_dir)
 
-            # Use the provided directory or the default one
+
             data_dir = Path(directory) if directory else self.data_dir
 
             combined_filepath = converter.combine_all_resources_into_single_file(data_dir)
@@ -35,9 +35,9 @@ class DataConverterUI(BaseUI):
             print(f"Error combining resources: {str(e)}")
             return None
 
-    def convert_to_yearly(self, directory=None):  # Updated method name
+    def convert_to_yearly(self, directory=None):
         try:
-            converter = YearlyEnergyDataConverter(output_dir=self.output_dir)  # Updated class name
+            converter = YearlyEnergyDataConverter(output_dir=self.output_dir)
             data_dir = Path(directory) if directory else self.data_dir
             file_pairs = converter.find_matching_resource_files(data_dir)
             if not file_pairs:
@@ -50,7 +50,7 @@ class DataConverterUI(BaseUI):
                 print(f" - {file}")
             return output_files
         except Exception as e:
-            print(f"Error converting data to yearly format: {str(e)}")  # Updated error message
+            print(f"Error converting data to yearly format: {str(e)}")
             return None
 
     def run(self):
@@ -58,7 +58,7 @@ class DataConverterUI(BaseUI):
 
         menu_options = {
             "1": "Combine all resources into a single JSONL file",
-            "2": "Convert data to yearly JSONL files",  # Updated menu option
+            "2": "Convert data to yearly JSONL files",
             "3": "Exit"
         }
 
@@ -68,7 +68,7 @@ class DataConverterUI(BaseUI):
             if choice == "1":
                 self.run_combination()
             elif choice == "2":
-                self.run_yearly_conversion()  # Updated method name
+                self.run_yearly_conversion()
             elif choice == "3":
                 break
 
@@ -86,7 +86,7 @@ class DataConverterUI(BaseUI):
         if not directory:
             return None
         
-        # Find all JSONL files in the directory
+
         jsonl_files = list(directory.glob("*.jsonl"))
         
         if not jsonl_files:
@@ -101,25 +101,25 @@ class DataConverterUI(BaseUI):
         
         print(f"\nConverting data from {directory} to yearly JSONL files...")
         
-        # Create the yearly converter
+
         from pipeline.data_processing.yearly_jsonl_converter import YearlyEnergyDataConverter
         converter = YearlyEnergyDataConverter(output_dir=self.output_dir)
         
-        # Convert to yearly files
+
         result = converter.convert_to_yearly_jsonl(jsonl_files)
         
         if result:
             print("\nYearly conversion complete! The data is now available as yearly summaries.")
             print("These files can be used for year-over-year comparisons and annual reporting.")
             
-            # Calculate some basic stats for the user
+
             num_years = len(result)
             years_covered = [Path(file).name.split('_')[0] for file in result]
             
             print(f"\nSummary files created for {num_years} years: {', '.join(years_covered)}")
             print(f"Files saved to: {self.output_dir}")
 
-            # Ask if user wants to convert to Parquet
+
             convert_to_parquet = self.get_yes_no_input("\nWould you like to convert these yearly files to Parquet format? (y/n): ")
             
             if convert_to_parquet:

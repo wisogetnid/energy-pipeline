@@ -234,7 +234,7 @@ class TestJsonlToParquetConverter:
         assert pd.api.types.is_numeric_dtype(first_row["consumption_value"])
         assert pd.api.types.is_numeric_dtype(first_row["cost_value"])
         
-        # Check that the consumption and cost values were preserved
+
         assert first_row["consumption_value"] == 0.047
         assert first_row["cost_value"] == 0.78773
     

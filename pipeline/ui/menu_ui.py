@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 
 from pipeline.ui.base_ui import BaseUI
 from pipeline.ui.data_retrieval_ui import DataRetrievalUI

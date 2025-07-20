@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 
 from pathlib import Path
 from pipeline.ui.base_ui import BaseUI
@@ -16,7 +16,7 @@ class ParquetUI(BaseUI):
         print("\nThis utility converts JSONL files to Parquet format.")
         print("Parquet files are more efficient for data analysis and visualization.")
         
-        # Find all JSONL files in the processed directory
+
         processed_dir = Path("data/processed")
         jsonl_files = list(processed_dir.glob("*.jsonl"))
         
