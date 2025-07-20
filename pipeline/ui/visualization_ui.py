@@ -377,5 +377,235 @@ class VisualizationUI(BaseUI):
         print(f"- Resource Cost (stacked): {costStackedPath}")
         print(f"- Cost (line): {costPath}")
 
-    def run(self):
-        return self.run_visualization()
+    def compare_theoretical_costs_cli(self):
+        """
+        CLI: Compare actual monthly cost with a theoretical cost using user-supplied rates for electricity and gas.
+        Uses the last 12 months of data found in JSONL summary files.
+        """
+        import calendar
+        from collections import defaultdict
+        # Only use JSONL summary files
+        jsonlSummaryFiles = sorted(Path("data/processed").glob("*_annual_energy_summary.jsonl"))
+        if not jsonlSummaryFiles:
+            print("No annual summary JSONL files found in data/processed.")
+            return False
+        # Collect all months across all years
+        month_entries = []  # List of (year, month, resource_consumptions, resource_costs)
+        for dataFile in jsonlSummaryFiles:
+            year = dataFile.name.split("_")[0]
+            with open(dataFile, "r") as f:
+                for line in f:
+                    entry = json.loads(line)
+                    if entry.get("data_type") == "monthly_summary":
+                        monthLabel = entry["month"].split("-")[1]
+                        monthNum = int(monthLabel)
+                        # Collect per-resource
+                        resource_consumptions = {}
+                        resource_costs = {}
+                        for k, v in entry.items():
+                            if isinstance(k, str) and k.endswith("_consumption_total"):
+                                resource = k.replace("_consumption_total", "")
+                                resource_consumptions[resource] = v
+                            if isinstance(k, str) and k.endswith("_cost_total"):
+                                resource = k.replace("_cost_total", "")
+                                resource_costs[resource] = v
+                        month_entries.append((int(year), monthNum, resource_consumptions, resource_costs))
+        if not month_entries:
+            print("No monthly summary data found in any JSONL files.")
+            return False
+        # Sort by (year, month)
+        month_entries.sort()
+        # Take last 12
+        last_12 = month_entries[-12:]
+        # Prompt for 4 rates, with units
+        print("\nEnter new rates:")
+        elec_standing = self.get_float_input("Electricity standing charge (pence per day): ")
+        elec_unit = self.get_float_input("Electricity unit rate (pence per kWh): ")
+        gas_standing = self.get_float_input("Gas standing charge (pence per day): ")
+        gas_unit = self.get_float_input("Gas unit rate (pence per kWh): ")
+        # Prepare
+        actual_costs = {"electricity": [], "gas": []}
+        theoretical_costs = {"electricity": [], "gas": []}
+        xlabels = []
+        for year, month, resource_consumptions, resource_costs in last_12:
+            label = f"{year}-{month:02d}"
+            xlabels.append(label)
+            for resource in ["electricity", "gas"]:
+                consumption = resource_consumptions.get(resource, 0)
+                actual = resource_costs.get(resource, 0)
+                if resource == "electricity":
+                    theo = (consumption * elec_unit) + (elec_standing * calendar.monthrange(year, month)[1])
+                else:
+                    theo = (consumption * gas_unit) + (gas_standing * calendar.monthrange(year, month)[1])
+                actual_costs[resource].append(actual)
+                theoretical_costs[resource].append(theo)
+        # Plot
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(15,8))
+        x = range(12)
+        for resource, color in zip(["electricity", "gas"], ["tab:blue", "tab:orange"]):
+            plt.plot(x, actual_costs[resource], marker='o', label=f'Actual {resource.capitalize()} Cost', color=color)
+            plt.plot(x, theoretical_costs[resource], marker='o', linestyle='--', label=f'Theoretical {resource.capitalize()} Cost', color=color, alpha=0.6)
+            # Annotate each point with value
+            for i in x:
+                plt.annotate(f"{actual_costs[resource][i]:.2f}", (i, actual_costs[resource][i]), textcoords="offset points", xytext=(0,6), ha='center', fontsize=8, color=color)
+                plt.annotate(f"{theoretical_costs[resource][i]:.2f}", (i, theoretical_costs[resource][i]), textcoords="offset points", xytext=(0,-12), ha='center', fontsize=8, color=color, alpha=0.7)
+        # Show input values on plot
+        input_text = (
+            f"Electricity standing: {elec_standing} £/day\n"
+            f"Electricity unit: {elec_unit} £/kWh\n"
+            f"Gas standing: {gas_standing} £/day\n"
+            f"Gas unit: {gas_unit} £/kWh"
+        )
+        plt.gcf().text(0.99, 0.01, input_text, fontsize=10, ha='right', va='bottom', bbox=dict(facecolor='white', alpha=0.7, edgecolor='gray'))
+        plt.title(f"Monthly Cost Comparison (Actual vs. Theoretical) for Last 12 Months")
+        plt.xlabel("Month")
+        plt.ylabel("Cost")
+        plt.xticks(x, xlabels, rotation=45)
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.7)
+        visualisationsDir = Path("data/visualisations") / "theoretical_comparison"
+        visualisationsDir.mkdir(parents=True, exist_ok=True)
+        outpath = visualisationsDir / f"last12_actual_vs_theoretical_electricity_gas.png"
+        plt.tight_layout()
+        plt.savefig(outpath)
+        plt.close()
+        print(f"\nComparison chart saved to: {outpath}")
+        return True
+
+    def compare_theoretical_costs_multi_plans_cli(self):
+        """
+        CLI: Compare actual monthly cost with theoretical costs using user-supplied rates for multiple energy plans.
+        Uses the last 12 months of data found in JSONL summary files.
+        """
+        import calendar
+        # Only use JSONL summary files
+        jsonlSummaryFiles = sorted(Path("data/processed").glob("*_annual_energy_summary.jsonl"))
+        if not jsonlSummaryFiles:
+            print("No annual summary JSONL files found in data/processed.")
+            return False
+        # Collect all months across all years
+        month_entries = []  # List of (year, month, resource_consumptions, resource_costs)
+        for dataFile in jsonlSummaryFiles:
+            year = dataFile.name.split("_")[0]
+            with open(dataFile, "r") as f:
+                for line in f:
+                    entry = json.loads(line)
+                    if entry.get("data_type") == "monthly_summary":
+                        monthLabel = entry["month"].split("-")[1]
+                        monthNum = int(monthLabel)
+                        # Collect per-resource
+                        resource_consumptions = {}
+                        resource_costs = {}
+                        for k, v in entry.items():
+                            if isinstance(k, str) and k.endswith("_consumption_total"):
+                                resource = k.replace("_consumption_total", "")
+                                resource_consumptions[resource] = v
+                            if isinstance(k, str) and k.endswith("_cost_total"):
+                                resource = k.replace("_cost_total", "")
+                                resource_costs[resource] = v
+                        month_entries.append((int(year), monthNum, resource_consumptions, resource_costs))
+        if not month_entries:
+            print("No monthly summary data found in any JSONL files.")
+            return False
+        # Sort by (year, month)
+        month_entries.sort()
+        # Take last 12
+        last_12 = month_entries[-12:]
+        # Prompt for number of plans
+        num_plans = self.get_int_input("How many energy plans do you want to compare? (1-5): ", 1, 5)
+        plans = []
+        for i in range(num_plans):
+            print(f"\nEnter rates for plan {i+1}:")
+            plan_name = input("Plan name: ") or f"Plan {i+1}"
+            elec_standing = self.get_float_input("  Electricity standing charge (pence per day): ")
+            elec_unit = self.get_float_input("  Electricity unit rate (pence per kWh): ")
+            gas_standing = self.get_float_input("  Gas standing charge (pence per day): ")
+            gas_unit = self.get_float_input("  Gas unit rate (pence per kWh): ")
+            plans.append({
+                'name': plan_name,
+                'elec_standing': elec_standing,
+                'elec_unit': elec_unit,
+                'gas_standing': gas_standing,
+                'gas_unit': gas_unit
+            })
+        # Prepare actual costs
+        actual_costs = {"electricity": [], "gas": []}
+        xlabels = []
+        for year, month, resource_consumptions, resource_costs in last_12:
+            label = f"{year}-{month:02d}"
+            xlabels.append(label)
+            for resource in ["electricity", "gas"]:
+                consumption = resource_consumptions.get(resource, 0)
+                actual = resource_costs.get(resource, 0)
+                actual_costs[resource].append(actual)
+        # Calculate theoretical costs for each plan
+        theoretical_costs = []  # List of dicts, one per plan
+        for plan in plans:
+            plan_costs = {"electricity": [], "gas": []}
+            for idx, (year, month, resource_consumptions, resource_costs) in enumerate(last_12):
+                for resource in ["electricity", "gas"]:
+                    consumption = resource_consumptions.get(resource, 0)
+                    if resource == "electricity":
+                        theo = (consumption * plan['elec_unit']) + (plan['elec_standing'] * calendar.monthrange(year, month)[1])
+                    else:
+                        theo = (consumption * plan['gas_unit']) + (plan['gas_standing'] * calendar.monthrange(year, month)[1])
+                    plan_costs[resource].append(theo)
+            theoretical_costs.append(plan_costs)
+        # Plot
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(15,8))
+        x = range(12)
+        # Plot actual costs
+        for resource, color in zip(["electricity", "gas"], ["tab:blue", "tab:orange"]):
+            plt.plot(x, actual_costs[resource], marker='o', label=f'Actual {resource.capitalize()} Cost', color=color)
+            for i in x:
+                plt.annotate(f"{actual_costs[resource][i]:.2f}", (i, actual_costs[resource][i]), textcoords="offset points", xytext=(0,6), ha='center', fontsize=8, color=color)
+        # Plot each plan
+        plan_colors = ["tab:green", "tab:red", "tab:purple", "tab:brown", "tab:gray"]
+        for pidx, plan in enumerate(plans):
+            color = plan_colors[pidx % len(plan_colors)]
+            for resource in ["electricity", "gas"]:
+                linestyle = '--' if resource == 'electricity' else ':'
+                label = f"{plan['name']} {resource.capitalize()} (theoretical)"
+                plt.plot(x, theoretical_costs[pidx][resource], marker='o', linestyle=linestyle, label=label, color=color, alpha=0.7)
+                for i in x:
+                    plt.annotate(f"{theoretical_costs[pidx][resource][i]:.2f}", (i, theoretical_costs[pidx][resource][i]), textcoords="offset points", xytext=(0,-12-10*pidx), ha='center', fontsize=8, color=color, alpha=0.7)
+        # Show all plan inputs on plot
+        input_text = "\n".join([
+            f"{plan['name']}: Elec Stand {plan['elec_standing']}p/d, Elec Unit {plan['elec_unit']}p/kWh, Gas Stand {plan['gas_standing']}p/d, Gas Unit {plan['gas_unit']}p/kWh"
+            for plan in plans
+        ])
+        plt.gcf().text(0.99, 0.01, input_text, fontsize=10, ha='right', va='bottom', bbox=dict(facecolor='white', alpha=0.7, edgecolor='gray'))
+        plt.title(f"Monthly Cost Comparison (Actual vs. Theoretical Plans) for Last 12 Months")
+        plt.xlabel("Month")
+        plt.ylabel("Cost (pence)")
+        plt.xticks(x, xlabels, rotation=45)
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.7)
+        visualisationsDir = Path("data/visualisations") / "theoretical_comparison"
+        visualisationsDir.mkdir(parents=True, exist_ok=True)
+        outpath = visualisationsDir / f"last12_actual_vs_theoretical_multi_plans.png"
+        plt.tight_layout()
+        plt.savefig(outpath)
+        plt.close()
+        print(f"\nComparison chart saved to: {outpath}")
+        return True
+    
+    def get_float_input(self, prompt, min_value=None, max_value=None):
+        """
+        Prompt the user for a float input, with optional min/max validation.
+        """
+        while True:
+            try:
+                value = input(prompt)
+                value = float(value)
+                if min_value is not None and value < min_value:
+                    print(f"Value must be at least {min_value}.")
+                    continue
+                if max_value is not None and value > max_value:
+                    print(f"Value must be at most {max_value}.")
+                    continue
+                return value
+            except ValueError:
+                print("Please enter a valid number.")

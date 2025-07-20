@@ -139,8 +139,9 @@ class MenuUI(BaseUI):
     def visualisation_menu(self):
         print("\nVisualisation Menu:")
         print("1. Monthly Consumption/Cost Comparison Across Years")
-        print("2. Back to Main Menu")
-        choice = self.get_int_input("\nEnter choice (1-2): ", 1, 2)
+        print("2. Theoretical Cost Comparison (last 12 months, electricity & gas)")
+        print("3. Back to Main Menu")
+        choice = self.get_int_input("\nEnter choice (1-3): ", 1, 3)
         if choice == 1:
             from pipeline.ui.visualization_ui import VisualizationUI
             result = VisualizationUI().run_monthly_summary_barchart()
@@ -150,6 +151,15 @@ class MenuUI(BaseUI):
             else:
                 print("\nFailed to generate visualizations. Please ensure you have annual summary data files.")
                 print("You may need to run the 'Convert to Yearly JSONL files' option in the Convert Data menu first.")
+            self.wait_for_user()
+        elif choice == 2:
+            from pipeline.ui.visualization_ui import VisualizationUI
+            result = VisualizationUI().compare_theoretical_costs_multi_plans_cli()
+            if result:
+                print("\nTheoretical cost comparison chart has been created successfully.")
+                print("Check the data/visualisations/theoretical_comparison directory for the chart.")
+            else:
+                print("\nFailed to generate theoretical cost comparison. Please ensure you have annual summary data files.")
             self.wait_for_user()
     
     def wait_for_user(self):
