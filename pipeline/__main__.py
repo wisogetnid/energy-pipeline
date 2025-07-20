@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 
 from pipeline.utils.credentials import get_credentials
 from pipeline.ui.glowmarkt_interactive import start_interactive_client

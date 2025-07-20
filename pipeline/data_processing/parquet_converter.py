@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 
 import json
 import logging
@@ -25,7 +25,7 @@ class JsonlToParquetConverter:
             raise FileNotFoundError(f"JSONL file not found: {jsonl_path}")
         
         try:
-            # Read JSONL file into a pandas DataFrame
+
             records = []
             with open(jsonl_path, 'r') as f:
                 for line in f:
@@ -38,28 +38,28 @@ class JsonlToParquetConverter:
             
             if not records:
                 logger.warning(f"No records found in {jsonl_path}")
-                # Create empty DataFrame to handle empty files gracefully
+
                 df = pd.DataFrame()
             else:
                 df = pd.DataFrame(records)
             
-            # Create output file path
+
             if output_file is None:
                 output_file = self.output_dir / f"{jsonl_path.stem}.parquet"
             else:
                 output_file = Path(output_file)
             
-            # Ensure output directory exists
+
             output_file.parent.mkdir(parents=True, exist_ok=True)
             
-            # Convert timestamp columns if needed
+
             if 'timestamp' in df.columns and df['timestamp'].dtype == 'object':
                 try:
                     df['timestamp'] = pd.to_numeric(df['timestamp'])
                 except:
                     pass
             
-            # Write to Parquet
+
             df.to_parquet(output_file, index=False)
             
             logger.info(f"Converted {jsonl_path} to Parquet format at {output_file}")

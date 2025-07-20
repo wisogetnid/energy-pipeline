@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 
 import os
 import json
@@ -486,12 +486,12 @@ class DataRetrievalUI(BaseUI):
             return None
     
     def run(self):
-        # First select the data source
+
         if not self.client:
             if not self.select_data_source():
                 return
         
-        # For Glowmarkt, we need to select an entity
+
         if self.client_type == 'glowmarkt':
             print("\nNote: First virtual entity will be automatically selected.")
             if not self.select_entity():
@@ -522,10 +522,10 @@ class DataRetrievalUI(BaseUI):
     def fetch_and_combine_resources(self):
         self.print_header("Combine Resources")
         
-        # Ask user to select a directory containing raw JSON files
+
         data_dir = Path("data")
         
-        # Find all subdirectories in data directory that contain JSON files
+
         valid_dirs = []
         for subdir in data_dir.iterdir():
             if subdir.is_dir() and list(subdir.glob("*.json")):
@@ -546,32 +546,32 @@ class DataRetrievalUI(BaseUI):
         max_option = len(valid_dirs) + (1 if self.client else 0)
         choice = self.get_int_input("\nSelect data source: ", 1, max_option)
         
-        # Use existing client to fetch new data
+
         if self.client and choice == len(valid_dirs) + 1:
             if self.client_type == 'glowmarkt':
                 if not self.selected_entity:
                     if not self.select_entity():
                         return False
                 return self._fetch_and_combine_glowmarkt_resources()
-            else:  # n3rgy
+            else:
                 return self._fetch_and_combine_n3rgy_resources()
         
-        # Process existing JSON files from selected directory
+
         selected_dir = valid_dirs[choice - 1]
         return self._process_existing_json_files(selected_dir)
 
     def _process_existing_json_files(self, directory):
         self.print_header(f"Processing Files from {directory.name}")
         
-        # Create a temporary directory for this run's files
+
         temp_dir = Path(tempfile.mkdtemp(prefix="energy_data_"))
         print(f"\nCreating temporary directory for data processing: {temp_dir}")
         
-        # Get all JSON files in the directory
+
         json_files = list(directory.glob("*.json"))
         print(f"\nFound {len(json_files)} JSON files in {directory}")
         
-        # Filter to show only resource types
+
         resource_types = set()
         for json_file in json_files:
             filename = json_file.name.lower()
@@ -584,18 +584,18 @@ class DataRetrievalUI(BaseUI):
         
         print(f"Resource types found: {', '.join(resource_types)}")
         
-        # Copy relevant files to the temp directory
+
         retrieved_files = []
         for json_file in json_files:
             temp_filepath = temp_dir / json_file.name
             
-            # Copy the file to the temp directory
+
             with open(json_file, 'r') as src_file, open(temp_filepath, 'w') as dst_file:
                 dst_file.write(src_file.read())
             
             retrieved_files.append(str(temp_filepath))
         
-        # Get date range for user information
+
         try:
             from_date = "unknown"
             to_date = "unknown"
@@ -653,11 +653,11 @@ class DataRetrievalUI(BaseUI):
             failed_resources = []
             skipped_resources = []
             
-            # Create a temporary directory specifically for this run's files
+
             temp_dir = Path(tempfile.mkdtemp(prefix="energy_data_"))
             print(f"\nCreating temporary directory for data processing: {temp_dir}")
             
-            # Current date range for naming files
+
             start_date_str = self.start_date.strftime("%Y%m%d") if isinstance(self.start_date, datetime) else "unknown"
             end_date_str = self.end_date.strftime("%Y%m%d") if isinstance(self.end_date, datetime) else "unknown"
             
@@ -672,18 +672,18 @@ class DataRetrievalUI(BaseUI):
                 self.selected_resource_unit = resource.get("baseUnit", "Unknown")
                 self.selected_resource_classifier = resource_classifier
                 
-                # First save to the permanent location
+
                 readings = self.retrieve_data()
                 if readings:
                     permanent_filepath = self.save_data(readings)
                     
                     if permanent_filepath:
-                        # Now copy to our temporary directory for processing just this run's files
+
                         resource_name_safe = resource_name.lower().replace(" ", "_")
                         temp_filename = f"{resource_name_safe}_{start_date_str}_to_{end_date_str}.json"
                         temp_filepath = temp_dir / temp_filename
                         
-                        # Copy the data to the temp directory
+
                         with open(permanent_filepath, 'r') as src_file, open(temp_filepath, 'w') as dst_file:
                             dst_file.write(src_file.read())
                         
@@ -703,27 +703,27 @@ class DataRetrievalUI(BaseUI):
             return False
         
         try:
-            # Process all files and create a combined JSONL
+
             print("\nProcessing all N3rgy CSV files...")
             
-            # Create a temp directory for this run's files
+
             import tempfile
             temp_dir = Path(tempfile.mkdtemp(prefix="energy_data_"))
             
-            # First process all files to JSON
+
             json_files = self.client.process_all_files(extract_cost=True, combine_to_jsonl=False)
             
             if not json_files:
                 print("No CSV files found or processing failed.")
                 return False
             
-            # Copy files to temp directory
+
             retrieved_files = []
             for json_file in json_files:
                 temp_filename = Path(json_file).name
                 temp_filepath = temp_dir / temp_filename
                 
-                # Copy the data to the temp directory
+
                 with open(json_file, 'r') as src_file, open(temp_filepath, 'w') as dst_file:
                     dst_file.write(src_file.read())
                 
@@ -761,7 +761,7 @@ class DataRetrievalUI(BaseUI):
             print("\nCombining resources into a single file...")
             from pipeline.data_processing.jsonl_converter import EnergyDataConverter
             
-            # Use our temporary directory that only contains files from this run
+
             output_dir = Path("data/processed")
             
             converter = EnergyDataConverter(output_dir=output_dir)
@@ -776,7 +776,7 @@ class DataRetrievalUI(BaseUI):
                     for filepath in combined_filepath:
                         print(f"- {filepath}")
                     
-                    # Ask which file to convert to Parquet
+
                     print("\nWould you like to convert these files to Parquet format?")
                     convert_to_parquet = self.get_yes_no_input("Convert to Parquet? (y/n): ")
                     
@@ -798,7 +798,7 @@ class DataRetrievalUI(BaseUI):
                             for filepath in parquet_filepaths:
                                 print(f"- {filepath}")
                     
-                    # Get the original paths, not the temp ones, for returning
+
                     original_paths = []
                     data_dir = self._get_data_directory()
                     for temp_path in retrieved_files:
@@ -806,7 +806,7 @@ class DataRetrievalUI(BaseUI):
                         original_path = os.path.join(data_dir, filename)
                         original_paths.append(original_path)
                     
-                    # Delete the temporary directory
+
                     import shutil
                     shutil.rmtree(temp_dir)
                     print(f"\nTemporary directory removed: {temp_dir}")
@@ -825,7 +825,7 @@ class DataRetrievalUI(BaseUI):
                     if parquet_filepath:
                         print(f"\nSuccessfully converted to Parquet format: {parquet_filepath}")
                         
-                        # Get the original paths, not the temp ones, for returning
+
                         original_paths = []
                         data_dir = self._get_data_directory()
                         for temp_path in retrieved_files:
@@ -833,21 +833,21 @@ class DataRetrievalUI(BaseUI):
                             original_path = os.path.join(data_dir, filename)
                             original_paths.append(original_path)
                         
-                        # Delete the temporary directory
+
                         import shutil
                         shutil.rmtree(temp_dir)
                         print(f"\nTemporary directory removed: {temp_dir}")
                         
                         return [parquet_filepath, combined_filepath, *original_paths]
                     else:
-                        # Delete the temporary directory
+
                         import shutil
                         shutil.rmtree(temp_dir)
                         print(f"\nTemporary directory removed: {temp_dir}")
                         
                         return [combined_filepath, *original_paths]
             else:
-                # Delete the temporary directory
+
                 import shutil
                 shutil.rmtree(temp_dir)
                 print(f"\nTemporary directory removed: {temp_dir}")
@@ -855,7 +855,7 @@ class DataRetrievalUI(BaseUI):
                 print("\nFailed to combine resources. Individual files are still available.")
                 return retrieved_files
         else:
-            # Delete the temporary directory
+
             import shutil
             shutil.rmtree(temp_dir)
             print(f"\nTemporary directory removed: {temp_dir}")

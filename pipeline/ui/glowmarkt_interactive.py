@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 
 from pipeline.ui.menu_ui import MenuUI
 

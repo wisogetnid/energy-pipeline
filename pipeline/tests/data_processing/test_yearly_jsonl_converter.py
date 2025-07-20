@@ -3,7 +3,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from pipeline.data_processing.yearly_jsonl_converter import YearlyEnergyDataConverter  # Updated import
+from pipeline.data_processing.yearly_jsonl_converter import YearlyEnergyDataConverter
 
 
 def load_fixture(filename):
@@ -12,12 +12,12 @@ def load_fixture(filename):
         return json.load(f)
 
 
-class TestYearlyEnergyDataConverter:  # Changed from TestGlowmarktEnergyDataConverter
+class TestYearlyEnergyDataConverter:
 
     @pytest.fixture
     def converter(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            yield YearlyEnergyDataConverter(output_dir=temp_dir)  # Updated class name
+            yield YearlyEnergyDataConverter(output_dir=temp_dir)
 
     @pytest.fixture
     def gas_consumption_data(self):
@@ -44,9 +44,9 @@ class TestYearlyEnergyDataConverter:  # Changed from TestGlowmarktEnergyDataConv
             "resource_id": "04678775-6c72-43c9-8378-c9914756384a",
             "resource_name": "electricity consumption",
             "readings": [
-                [1738368000, 0.047],  # 2025-02-01
-                [1738454400, 0.059],  # 2025-02-02
-                [1769980800, 0.039]   # 2026-02-01
+                [1738368000, 0.047],
+                [1738454400, 0.059],
+                [1769980800, 0.039]
             ]
         }
 
@@ -97,20 +97,20 @@ class TestYearlyEnergyDataConverter:  # Changed from TestGlowmarktEnergyDataConv
 
         assert len(output_files) == 2
 
-        output_2025 = Path(converter.output_dir) / "2025_annual_energy_summary.jsonl"  # Updated filename
-        output_2026 = Path(converter.output_dir) / "2026_annual_energy_summary.jsonl"  # Updated filename
+        output_2025 = Path(converter.output_dir) / "2025_annual_energy_summary.jsonl"
+        output_2026 = Path(converter.output_dir) / "2026_annual_energy_summary.jsonl"
 
         assert str(output_2025) in output_files
         assert str(output_2026) in output_files
 
         with open(output_2025, 'r') as f:
             lines = f.readlines()
-            assert len(lines) >= 1  # At least the yearly summary line
+            assert len(lines) >= 1
+
             
-            # Find daily records
             daily_records = [json.loads(line) for line in lines if json.loads(line).get('data_type') == 'daily_summary']
             
-            # Check for Feb 1st and 2nd, 2025
+
             feb01 = next((record for record in daily_records if record.get('date') == '2025-02-01'), None)
             feb02 = next((record for record in daily_records if record.get('date') == '2025-02-02'), None)
             
@@ -121,12 +121,12 @@ class TestYearlyEnergyDataConverter:  # Changed from TestGlowmarktEnergyDataConv
 
         with open(output_2026, 'r') as f:
             lines = f.readlines()
-            assert len(lines) >= 1  # At least the yearly summary line
+            assert len(lines) >= 1
+
             
-            # Find daily records
             daily_records = [json.loads(line) for line in lines if json.loads(line).get('data_type') == 'daily_summary']
             
-            # Check for Feb 1st, 2026
+
             feb01 = next((record for record in daily_records if record.get('date') == '2026-02-01'), None)
             
             assert feb01 is not None

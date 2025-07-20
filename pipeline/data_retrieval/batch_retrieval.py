@@ -1,4 +1,4 @@
-"""Module for retrieving Glowmarkt data in batches."""
+
 
 import logging
 from datetime import datetime, timedelta

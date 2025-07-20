@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 
 import pandas as pd
 import numpy as np
@@ -133,9 +133,7 @@ def generate_weekday_weekend_pattern(df, resource_type, consumption_unit, output
     return file_path
 
 def generate_all_visualizations(file_path, output_dir):
-    """
-    Generates all visualizations for a given data file.
-    """
+
     try:
         df, resource_type, unit = load_and_process_consumption_data(file_path)
 

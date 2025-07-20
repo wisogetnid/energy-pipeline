@@ -265,34 +265,34 @@ class TestN3rgyCSVClient(unittest.TestCase):
                 self.assertIn('electricity_consumption', record)
                 self.assertIn('gas_consumption', record)
 
-    # Fix for the n3rgy_csv_client.py file
+
     def _extract_date_range_from_filename(self, filename):
-        """Extract date range from a filename in format YYYYMMDD_to_YYYYMMDD."""
-        # Try to find pattern like 20250101_to_20250131
+
+
         date_pattern = r'(\d{8})_to_(\d{8})'
         match = re.search(date_pattern, filename)
         if match:
             return f"{match.group(1)}_to_{match.group(2)}"
         
-        # Try to find pattern like 202405 (YYYYMM) and convert to full date range
+
         month_pattern = r'(\d{4})(\d{2})'
         match = re.search(month_pattern, filename)
         if match: 
             year = int(match.group(1))
             month = int(match.group(2))
             import calendar
-            # Check if it's a leap year for February
+
             last_day = calendar.monthrange(year, month)[1]
             return f"{year}{month:02d}01_to_{year}{month:02d}{last_day:02d}"
         
-        # Try to find pattern like 2024-05 (YYYY-MM) and convert to full date range
+
         month_pattern_dash = r'(\d{4})-(\d{2})'
         match = re.search(month_pattern_dash, filename)
         if match:
             year = int(match.group(1))
             month = int(match.group(2))
             import calendar
-            # Check if it's a leap year for February
+
             last_day = calendar.monthrange(year, month)[1]
             return f"{year}{month:02d}01_to_{year}{month:02d}{last_day:02d}"
         
