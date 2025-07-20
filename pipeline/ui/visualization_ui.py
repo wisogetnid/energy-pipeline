@@ -130,6 +130,8 @@ class VisualizationUI(BaseUI):
                 months = []
                 consumptionTotals = []
                 costTotals = []
+                resource_consumptions = {}
+                resource_costs = {}
                 
                 with open(dataFile, "r") as f:
                     for line in f:
@@ -139,12 +141,25 @@ class VisualizationUI(BaseUI):
                             months.append(monthLabel)
                             consumptionTotals.append(entry["consumption_total"])
                             costTotals.append(entry["cost_total"])
+                            for k, v in entry.items():
+                                if isinstance(k, str) and k.endswith("_consumption_total"):
+                                    resource = k.replace("_consumption_total", "")
+                                    if resource not in resource_consumptions:
+                                        resource_consumptions[resource] = []
+                                    resource_consumptions[resource].append(v)
+                                if isinstance(k, str) and k.endswith("_cost_total"):
+                                    resource = k.replace("_cost_total", "")
+                                    if resource not in resource_costs:
+                                        resource_costs[resource] = []
+                                    resource_costs[resource].append(v)
                 
                 if months:
                     yearlyData[year] = {
                         "months": months,
                         "consumption": consumptionTotals,
-                        "cost": costTotals
+                        "cost": costTotals,
+                        "resource_consumptions": resource_consumptions,
+                        "resource_costs": resource_costs
                     }
             
             elif dataFile.suffix.lower() == '.parquet':
@@ -155,14 +170,26 @@ class VisualizationUI(BaseUI):
                     
                     if not monthlyDf.empty:
                         months = []
-                        for month in monthlyDf['month']:
-                            monthLabel = month.split("-")[1]
+                        resource_consumptions = {}
+                        resource_costs = {}
+                        for idx, row in monthlyDf.iterrows():
+                            monthLabel = row['month'].split("-")[1]
                             months.append(monthLabel)
-                            
+                            for k, v in row.items():
+                                if isinstance(k, str) and k.endswith("_consumption_total"):
+                                    resource = k.replace("_consumption_total", "")
+                                    if resource not in resource_consumptions:
+                                        resource_consumptions[resource] = []
+                                    resource_consumptions[resource].append(v)
+                                if isinstance(k, str) and k.endswith("_cost_total"):
+                                    resource = k.replace("_cost_total", "")
+                                    if resource not in resource_costs:
+                                        resource_costs[resource] = []
+                                    resource_costs[resource].append(v)
                         yearlyData[year] = {
                             "months": months,
-                            "consumption": monthlyDf['consumption_total'].tolist(),
-                            "cost": monthlyDf['cost_total'].tolist()
+                            "resource_consumptions": resource_consumptions,
+                            "resource_costs": resource_costs
                         }
                 except Exception as e:
                     print(f"Error processing parquet file {dataFile}: {str(e)}")
@@ -175,61 +202,180 @@ class VisualizationUI(BaseUI):
         return True
         
     def _create_overlay_charts(self, yearlyData):
+        import numpy as np
+        import matplotlib.pyplot as plt
         monthNames = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-        
-        # Create consumption comparison chart
-        plt.figure(figsize=(12, 7))
-        
-        for year, data in sorted(yearlyData.items()):
-            if len(data["months"]) == 0:
-                continue
-                
-            monthIndices = [int(month) - 1 for month in data["months"]]
-            xPositions = range(len(monthIndices))
-            
-            plt.plot(monthIndices, data["consumption"], marker='o', label=year)
-        
-        plt.title("Monthly Consumption Comparison Across Years")
+        resource_keys = set()
+        for year, data in yearlyData.items():
+            if 'resource_consumptions' in data:
+                for r in data['resource_consumptions']:
+                    resource_keys.add(r)
+        if not resource_keys:
+            for year, data in yearlyData.items():
+                for k in data.keys():
+                    if k not in ["months", "consumption", "cost"] and k.endswith("_consumption"):
+                        resource_keys.add(k.replace("_consumption", ""))
+        resource_keys = sorted(resource_keys)
+        year_resource_month = {}
+        year_resource_cost_month = {}
+        for year, data in yearlyData.items():
+            months = data["months"]
+            # Map month label to index
+            month_to_idx = {m: i for i, m in enumerate(monthNames)}
+            year_resource_month[year] = {}
+            year_resource_cost_month[year] = {}
+            for resource in resource_keys:
+                values = [0] * 12
+                cost_values = [0] * 12
+                # Fill values by month index
+                if 'resource_consumptions' in data and resource in data['resource_consumptions']:
+                    for i, m in enumerate(months):
+                        idx = month_to_idx.get(m, None)
+                        if idx is not None and i < len(data['resource_consumptions'][resource]):
+                            values[idx] = data['resource_consumptions'][resource][i]
+                if 'resource_costs' in data and resource in data['resource_costs']:
+                    for i, m in enumerate(months):
+                        idx = month_to_idx.get(m, None)
+                        if idx is not None and i < len(data['resource_costs'][resource]):
+                            cost_values[idx] = data['resource_costs'][resource][i]
+                year_resource_month[year][resource] = values
+                year_resource_cost_month[year][resource] = cost_values
+        # Plot stacked bar chart for consumption
+        plt.figure(figsize=(14, 8))
+        bar_width = 0.7 / max(1, len(year_resource_month))
+        x = np.arange(12)
+        for idx, (year, resource_months) in enumerate(sorted(year_resource_month.items())):
+            bottom = np.zeros(12)
+            for resource in resource_keys:
+                vals = resource_months[resource]
+                plt.bar(x + idx * bar_width, vals, bar_width, label=f"{year} {resource}", bottom=bottom)
+                bottom += np.array(vals)
+        plt.title("Monthly Resource Consumption Comparison (Stacked by Resource)")
         plt.xlabel("Month")
         plt.ylabel("Consumption")
-        plt.xticks(range(12), ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
+        plt.xticks(x + bar_width * (len(year_resource_month) - 1) / 2, ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
         plt.legend()
         plt.grid(True, linestyle='--', alpha=0.7)
-        
         visualisationsDir = Path("data/visualisations") / "monthly_summary"
         visualisationsDir.mkdir(parents=True, exist_ok=True)
-        consumptionPath = visualisationsDir / "yearly_consumption_comparison.png"
+        consumptionPath = visualisationsDir / "yearly_resource_consumption_stacked.png"
         plt.tight_layout()
         plt.savefig(consumptionPath)
         plt.close()
-        
-        # Create cost comparison chart
+        # Plot stacked bar chart for cost
+        plt.figure(figsize=(14, 8))
+        for idx, (year, resource_cost_months) in enumerate(sorted(year_resource_cost_month.items())):
+            bottom = np.zeros(12)
+            for resource in resource_keys:
+                vals = resource_cost_months[resource]
+                plt.bar(x + idx * bar_width, vals, bar_width, label=f"{year} {resource}", bottom=bottom)
+                bottom += np.array(vals)
+        plt.title("Monthly Resource Cost Comparison (Stacked by Resource)")
+        plt.xlabel("Month")
+        plt.ylabel("Cost")
+        plt.xticks(x + bar_width * (len(year_resource_cost_month) - 1) / 2, ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.7)
+        costStackedPath = visualisationsDir / "yearly_resource_cost_stacked.png"
+        plt.tight_layout()
+        plt.savefig(costStackedPath)
+        plt.close()
+        # Cost as line chart for each year (legacy)
         plt.figure(figsize=(12, 7))
-        
         for year, data in sorted(yearlyData.items()):
-            if len(data["months"]) == 0:
+            if len(data.get("months", [])) == 0:
                 continue
-                
-            monthIndices = [int(month) - 1 for month in data["months"]]
-            xPositions = range(len(monthIndices))
-            
-            plt.plot(monthIndices, data["cost"], marker='o', label=year)
-        
+            # Pad cost to 12 months, matching month indices
+            cost_padded = [0] * 12
+            months = data["months"]
+            # If 'cost' is missing or all zeros, sum per-resource costs
+            costs = data.get("cost", None)
+            if not costs or all(c == 0 for c in costs):
+                # Sum per-resource costs for each month
+                resource_costs = data.get("resource_costs", {})
+                for i, m in enumerate(months):
+                    try:
+                        idx = int(m) - 1
+                        if 0 <= idx < 12:
+                            cost_padded[idx] = sum(
+                                resource_costs[r][i] if i < len(resource_costs[r]) else 0
+                                for r in resource_costs
+                            )
+                    except Exception:
+                        continue
+            else:
+                for i, m in enumerate(months):
+                    try:
+                        idx = int(m) - 1
+                        if 0 <= idx < 12 and i < len(costs):
+                            cost_padded[idx] = costs[i]
+                    except Exception:
+                        continue
+            plt.plot(range(12), cost_padded, marker='o', label=year)
         plt.title("Monthly Cost Comparison Across Years")
         plt.xlabel("Month")
         plt.ylabel("Cost")
         plt.xticks(range(12), ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
         plt.legend()
         plt.grid(True, linestyle='--', alpha=0.7)
-        
         costPath = visualisationsDir / "yearly_cost_comparison.png"
         plt.tight_layout()
         plt.savefig(costPath)
         plt.close()
-        
+        # Improved: Use different shades for stacks of the same bar (per year)
+        import matplotlib.colors as mcolors
+        plt.figure(figsize=(14, 8))
+        base_colors = list(mcolors.TABLEAU_COLORS.values())
+        year_list = list(sorted(year_resource_month.keys()))
+        bar_width = 0.7 / max(1, len(year_list))
+        x = np.arange(12)
+        for idx, year in enumerate(year_list):
+            resource_months = year_resource_month[year]
+            bottom = np.zeros(12)
+            base_color = base_colors[idx % len(base_colors)]
+            # Generate shades for each resource
+            n_resources = len(resource_keys)
+            shades = [mcolors.to_rgba(base_color, alpha=0.7 - 0.5 * (i / max(1, n_resources-1))) for i in range(n_resources)]
+            for r_idx, resource in enumerate(resource_keys):
+                vals = resource_months[resource]
+                plt.bar(x + idx * bar_width, vals, bar_width, label=f"{year} {resource}", bottom=bottom, color=shades[r_idx])
+                bottom += np.array(vals)
+        plt.title("Monthly Resource Consumption Comparison (Stacked by Resource)")
+        plt.xlabel("Month")
+        plt.ylabel("Consumption")
+        plt.xticks(x + bar_width * (len(year_list) - 1) / 2, ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.7)
+        consumptionPath = visualisationsDir / "yearly_resource_consumption_stacked.png"
+        plt.tight_layout()
+        plt.savefig(consumptionPath)
+        plt.close()
+        # Improved: Use different shades for cost stacks as well
+        plt.figure(figsize=(14, 8))
+        for idx, year in enumerate(year_list):
+            resource_cost_months = year_resource_cost_month[year]
+            bottom = np.zeros(12)
+            base_color = base_colors[idx % len(base_colors)]
+            n_resources = len(resource_keys)
+            shades = [mcolors.to_rgba(base_color, alpha=0.7 - 0.5 * (i / max(1, n_resources-1))) for i in range(n_resources)]
+            for r_idx, resource in enumerate(resource_keys):
+                vals = resource_cost_months[resource]
+                plt.bar(x + idx * bar_width, vals, bar_width, label=f"{year} {resource}", bottom=bottom, color=shades[r_idx])
+                bottom += np.array(vals)
+        plt.title("Monthly Resource Cost Comparison (Stacked by Resource)")
+        plt.xlabel("Month")
+        plt.ylabel("Cost")
+        plt.xticks(x + bar_width * (len(year_list) - 1) / 2, ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.7)
+        costStackedPath = visualisationsDir / "yearly_resource_cost_stacked.png"
+        plt.tight_layout()
+        plt.savefig(costStackedPath)
+        plt.close()
         print(f"Created overlaid yearly comparison charts:")
-        print(f"- Consumption: {consumptionPath}")
-        print(f"- Cost: {costPath}")
+        print(f"- Resource Consumption (stacked): {consumptionPath}")
+        print(f"- Resource Cost (stacked): {costStackedPath}")
+        print(f"- Cost (line): {costPath}")
 
     def run(self):
         return self.run_visualization()

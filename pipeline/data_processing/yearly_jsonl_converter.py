@@ -1,11 +1,10 @@
-
 import json
 import logging
 import re
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Union, Any, Tuple
 
 from pipeline.data_processing.jsonl_converter import EnergyDataConverter
 
@@ -20,18 +19,18 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
             super().__init__(output_dir)
         else:
             super().__init__()
+        self.resource_metadata = {}
     
-    def find_matching_resource_files(self, directory: Union[str, Path]) -> List[Path]:
+    def find_matching_resource_files(self, directory: Union[str, Path]) -> List[Tuple[str, str]]:
         directory = Path(directory)
         jsonl_files = list(directory.glob("*.jsonl"))
         
         if not jsonl_files:
-
             json_files = list(directory.glob("*.json"))
-            return [(f, f) for f in json_files]
+            return [(str(f), str(f)) for f in json_files]
         
         logger.info(f"Found {len(jsonl_files)} JSONL files in {directory}")
-        return [(f, f) for f in jsonl_files]
+        return [(str(f), str(f)) for f in jsonl_files]
     
     def _group_and_sum_by_day(self, merged_readings: Dict[int, Dict]) -> Dict[str, Dict]:
         daily_data = defaultdict(lambda: {'consumption_value': 0, 'cost_value': 0, 'count': 0})
@@ -219,6 +218,28 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                             'consumption': consumption,
                             'cost': cost
                         })
+                        
+                        # Store resource-specific consumption and cost
+                        for resource in resource_types:
+                            consumption_key = f'{resource}_consumption'
+                            cost_key = f'{resource}_cost'
+                            
+                            if consumption_key in data and data[consumption_key] is not None:
+                                if consumption_key not in yearly_data[year][date_str]:
+                                    yearly_data[year][date_str][consumption_key] = 0
+                                yearly_data[year][date_str][consumption_key] += float(data[consumption_key])
+                                
+                                # Store resource metadata
+                                if resource not in self.resource_metadata:
+                                    self.resource_metadata[resource] = {
+                                        'consumption_unit': data.get(f'{resource}_consumption_unit', 'unknown'),
+                                        'cost_unit': data.get(f'{resource}_cost_unit', 'unknown')
+                                    }
+                            
+                            if cost_key in data and data[cost_key] is not None:
+                                if cost_key not in yearly_data[year][date_str]:
+                                    yearly_data[year][date_str][cost_key] = 0
+                                yearly_data[year][date_str][cost_key] += float(data[cost_key])
                     except Exception as e:
                         logger.warning(f"Error processing line in {file_path}: {e}")
                         continue
@@ -229,89 +250,73 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
         return yearly_data
     
     def convert_to_yearly_jsonl(self, files: List[Union[Path, str, tuple]]) -> List[str]:
-        yearly_data_combined = defaultdict(lambda: defaultdict(lambda: {'consumption_value': 0, 'cost_value': 0, 'count': 0, 'readings': []}))
-        metadata = {}
-        
+        yearly_data_combined = defaultdict(lambda: defaultdict(lambda: {'consumption_value': 0, 'cost_value': 0, 'count': 0}))
+        self.resource_metadata = {}
         for file_item in files:
-
             if isinstance(file_item, tuple):
                 file_path = Path(file_item[0])
             else:
                 file_path = Path(file_item)
-            
             logger.info(f"Processing file: {file_path}")
-            
-
             if file_path.suffix.lower() == '.jsonl':
                 file_yearly_data = self._process_jsonl_file(file_path)
-                
-
                 for year, days in file_yearly_data.items():
                     for day, data in days.items():
-                        yearly_data_combined[year][day]['consumption_value'] += data['consumption_value']
-                        yearly_data_combined[year][day]['cost_value'] += data['cost_value']
-                        yearly_data_combined[year][day]['count'] += data['count']
-                        yearly_data_combined[year][day]['readings'].extend(data['readings'])
+                        for k, v in data.items():
+                            if k in yearly_data_combined[year][day] and isinstance(v, (int, float)):
+                                yearly_data_combined[year][day][k] += v
+                            elif k not in yearly_data_combined[year][day]:
+                                yearly_data_combined[year][day][k] = v
             elif file_path.suffix.lower() == '.json':
-
                 if isinstance(file_item, tuple) and len(file_item) == 2:
                     consumption_file, cost_file = file_item
                     merged_readings, resource_metadata = self.merge_consumption_and_cost_data(consumption_file, cost_file)
                     daily_data = self._group_and_sum_by_day(merged_readings)
-                    
-
-                    if resource_metadata:
-                        for key, value in resource_metadata.items():
-                            if key not in metadata:
-                                metadata[key] = value
-                    
-
+                    resource_type = resource_metadata.get('resource_type', 'unknown')
+                    if resource_type != 'unknown':
+                        self.resource_metadata[resource_type] = resource_metadata
                     for day, values in daily_data.items():
                         year = day.split('-')[0]
-                        yearly_data_combined[year][day]['consumption_value'] += values['consumption_value']
-                        yearly_data_combined[year][day]['cost_value'] += values['cost_value']
-                        yearly_data_combined[year][day]['count'] += values['count']
-        
-
+                        for k, v in values.items():
+                            if k in yearly_data_combined[year][day] and isinstance(v, (int, float)):
+                                yearly_data_combined[year][day][k] += v
+                            elif k not in yearly_data_combined[year][day]:
+                                yearly_data_combined[year][day][k] = v
         output_files = []
-        
         for year, daily_readings in yearly_data_combined.items():
             if not daily_readings:
                 continue
-                
             output_file = self.output_dir / f"{year}_annual_energy_summary.jsonl"
             output_files.append(str(output_file))
-            
-
             monthly_data = defaultdict(lambda: {'consumption_value': 0, 'cost_value': 0, 'count': 0})
             for day, data in daily_readings.items():
                 month = day[:7]
-                monthly_data[month]['consumption_value'] += data['consumption_value']
-                monthly_data[month]['cost_value'] += data['cost_value']
-                monthly_data[month]['count'] += data['count']
-            
-
-            year_total_consumption = sum(data['consumption_value'] for data in daily_readings.values())
-            year_total_cost = sum(data['cost_value'] for data in daily_readings.values())
-            year_total_readings = sum(data['count'] for data in daily_readings.values())
-            
-
+                for k, v in data.items():
+                    if k in monthly_data[month] and isinstance(v, (int, float)):
+                        monthly_data[month][k] += v
+                    elif k not in monthly_data[month]:
+                        monthly_data[month][k] = v
             with open(output_file, 'w') as f:
-
+                # Yearly summary
                 summary = {
                     'year': year,
-                    'consumption_total': year_total_consumption,
-                    'cost_total': year_total_cost,
-                    'reading_count': year_total_readings,
+                    'consumption_total': sum(d['consumption_value'] for d in daily_readings.values()),
+                    'cost_total': sum(d['cost_value'] for d in daily_readings.values()),
+                    'reading_count': sum(d['count'] for d in daily_readings.values()),
                     'days_with_readings': len(daily_readings),
                     'from_date': f"{year}-01-01",
                     'to_date': f"{year}-12-31",
-                    'data_type': 'yearly_summary',
-                    **metadata
+                    'data_type': 'yearly_summary'
                 }
+                for resource, meta in self.resource_metadata.items():
+                    c_key = f'{resource}_consumption'
+                    cost_key = f'{resource}_cost'
+                    summary[f'{resource}_consumption_total'] = sum(d.get(c_key, 0) for d in daily_readings.values())
+                    summary[f'{resource}_consumption_unit'] = meta.get('consumption_unit', 'unknown')
+                    summary[f'{resource}_cost_total'] = sum(d.get(cost_key, 0) for d in daily_readings.values())
+                    summary[f'{resource}_cost_unit'] = meta.get('cost_unit', 'unknown')
                 f.write(json.dumps(summary) + '\n')
-                
-
+                # Monthly summaries
                 for month, data in sorted(monthly_data.items()):
                     month_summary = {
                         'year': year,
@@ -319,23 +324,34 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                         'consumption_total': data['consumption_value'],
                         'cost_total': data['cost_value'],
                         'reading_count': data['count'],
-                        'data_type': 'monthly_summary',
-                        **metadata
+                        'data_type': 'monthly_summary'
                     }
+                    for resource, meta in self.resource_metadata.items():
+                        c_key = f'{resource}_consumption'
+                        cost_key = f'{resource}_cost'
+                        month_summary[f'{resource}_consumption_total'] = data.get(c_key, 0)
+                        month_summary[f'{resource}_consumption_unit'] = meta.get('consumption_unit', 'unknown')
+                        month_summary[f'{resource}_cost_total'] = data.get(cost_key, 0)
+                        month_summary[f'{resource}_cost_unit'] = meta.get('cost_unit', 'unknown')
                     f.write(json.dumps(month_summary) + '\n')
-                
-
+                # Daily summaries
                 for day, data in sorted(daily_readings.items()):
                     day_summary = {
                         'date': day,
                         'consumption_total': data['consumption_value'],
                         'cost_total': data['cost_value'],
                         'reading_count': data['count'],
-                        'data_type': 'daily_summary',
-                        **metadata
+                        'data_type': 'daily_summary'
                     }
+                    for resource, meta in self.resource_metadata.items():
+                        c_key = f'{resource}_consumption'
+                        cost_key = f'{resource}_cost'
+                        if c_key in data:
+                            day_summary[f'{resource}_consumption'] = data[c_key]
+                            day_summary[f'{resource}_consumption_unit'] = meta.get('consumption_unit', 'unknown')
+                        if cost_key in data:
+                            day_summary[f'{resource}_cost'] = data[cost_key]
+                            day_summary[f'{resource}_cost_unit'] = meta.get('cost_unit', 'unknown')
                     f.write(json.dumps(day_summary) + '\n')
-            
             logger.info(f"Written yearly summary for {year} with {len(daily_readings)} days to {output_file}")
-        
         return output_files
