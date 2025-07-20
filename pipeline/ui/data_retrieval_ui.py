@@ -49,9 +49,17 @@ class DataRetrievalUI(BaseUI):
     def setup_glowmarkt_client(self, username=None, password=None, token=None):
         self.print_header("Glowmarkt API Authentication")
         
+        if self.client_type == 'glowmarkt' and not (username or token):
+            from pipeline.utils.credentials import get_credentials
+            env_username, env_password, env_token = get_credentials()
+            username = username or env_username
+            password = password or env_password
+            token = token or env_token
+            print("Using credentials from environment variables.")
+        
         self.client = GlowmarktClient(username=username, password=password, token=token)
         
-        if not token and username and password:
+        if self.client_type == 'glowmarkt' and not token and username and password:
             try:
                 print("Authenticating with Glowmarkt API...")
                 token = self.client.authenticate()

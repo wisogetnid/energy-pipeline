@@ -1,15 +1,12 @@
 from pipeline.ui.base_ui import BaseUI
 from pipeline.ui.data_retrieval_ui import DataRetrievalUI
+from pipeline.data_retrieval import GlowmarktClient
 
 class MenuUI(BaseUI):
     
     def __init__(self, username=None, password=None, token=None):
         super().__init__()
         self.retrieval_ui = DataRetrievalUI()
-        
-        if username or password or token:
-            self.retrieval_ui.client_type = 'glowmarkt'
-            self.retrieval_ui.setup_glowmarkt_client(username, password, token)
     
     def display_welcome(self):
         print("\n" + "=" * 80)
@@ -26,9 +23,10 @@ class MenuUI(BaseUI):
             print("1. Retrieve Data")
             print("2. Convert Data")
             print("3. Visualise Data")
-            print("4. Exit")
+            print("4. Retrieve Token")
+            print("5. Exit")
             
-            choice = self.get_int_input("\nEnter choice (1-4): ", 1, 4)
+            choice = self.get_int_input("\nEnter choice (1-5): ", 1, 5)
             
             if choice == 1:
                 self.retrieve_data_menu()
@@ -37,6 +35,8 @@ class MenuUI(BaseUI):
             elif choice == 3:
                 self.visualisation_menu()
             elif choice == 4:
+                self.retrieve_token()
+            elif choice == 5:
                 print("\nExiting Energy Pipeline. Goodbye!")
                 break
     
@@ -67,7 +67,7 @@ class MenuUI(BaseUI):
                 self.retrieval_ui.client_type = 'n3rgy'
                 self.retrieval_ui.setup_n3rgy_client()
             
-            if self.retrieval_ui.client:
+            if self.retrieval_ui.client and self.retrieval_ui.client_type == 'n3rgy':
                 print("\nProcessing N3rgy CSV files...")
                 json_files = self.retrieval_ui.client.process_all_files(extract_cost=True, combine_to_jsonl=True)
                 
@@ -79,7 +79,7 @@ class MenuUI(BaseUI):
                 else:
                     print("\nNo files were processed or no CSV files found.")
             else:
-                print("\nN3rgy client setup failed.")
+                print("Error: process_all_files is not supported for the current client type or client is not initialized.")
             
             self.wait_for_user()
     
@@ -147,6 +147,31 @@ class MenuUI(BaseUI):
     
     def wait_for_user(self):
         input("\nPress Enter to continue...")
+    
+    def retrieve_token(self):
+        self.print_header("Retrieve Token")
+
+        from pipeline.utils.credentials import get_credentials
+        username, password, token = get_credentials()
+
+        if token:
+            print(f"\nSuccess! Your token is: {token}")
+        else:
+            try:
+                # Use the client to authenticate and get a new token
+                if not self.retrieval_ui.client or not isinstance(self.retrieval_ui.client, GlowmarktClient):
+                    self.retrieval_ui.client_type = 'glowmarkt'
+                    self.retrieval_ui.setup_glowmarkt_client(username, password)
+                
+                if self.retrieval_ui.client and isinstance(self.retrieval_ui.client, GlowmarktClient):
+                    token = self.retrieval_ui.client.authenticate()
+                    print(f"\nSuccess! Your token is: {token}")
+                else:
+                    print("\nFailed to initialize client properly.")
+            except Exception as e:
+                print(f"\nFailed to retrieve token: {str(e)}")
+
+        self.wait_for_user()
     
     def run(self):
         self.display_main_menu()
