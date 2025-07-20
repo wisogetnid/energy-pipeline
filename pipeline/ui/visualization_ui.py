@@ -102,46 +102,134 @@ class VisualizationUI(BaseUI):
     
     def run_monthly_summary_barchart(self):
         self.print_header("Monthly Consumption/Cost Comparison")
-        summary_files = sorted(Path("data/processed").glob("*_annual_energy_summary.jsonl"))
-        if not summary_files:
-            print("No annual summary files found in data/processed.")
+        
+        jsonlSummaryFiles = sorted(Path("data/processed").glob("*_annual_energy_summary.jsonl"))
+        parquetProcessedFiles = sorted(Path("data/processed").glob("*_annual_energy_summary.parquet"))
+        parquetDirFiles = sorted(Path("data/parquet").glob("*_annual_energy_summary.parquet"))
+        
+        allFiles = []
+        yearlyData = {}
+        
+        if jsonlSummaryFiles:
+            allFiles.extend(jsonlSummaryFiles)
+            
+        if parquetProcessedFiles or parquetDirFiles:
+            allParquetFiles = parquetProcessedFiles + parquetDirFiles
+            allFiles.extend(allParquetFiles)
+        
+        if not allFiles:
+            print("No annual summary files found in data/processed or data/parquet.")
             return False
-
-        for summary_file in summary_files:
-            year = summary_file.name.split("_")[0]
-            months = []
-            consumption_totals = []
-            cost_totals = []
-            with open(summary_file, "r") as f:
-                for line in f:
-                    entry = json.loads(line)
-                    if entry.get("data_type") == "monthly_summary":
-                        months.append(entry["month"])
-                        consumption_totals.append(entry["consumption_total"])
-                        cost_totals.append(entry["cost_total"])
-            if not months:
-                print(f"No monthly summary data in {summary_file.name}")
-                continue
-
-            x = range(len(months))
-            fig, ax1 = plt.subplots(figsize=(10, 6))
-            width = 0.35
-            ax1.bar([i - width/2 for i in x], consumption_totals, width, label="Consumption", color="tab:blue")
-            ax1.bar([i + width/2 for i in x], cost_totals, width, label="Cost", color="tab:orange")
-            ax1.set_xlabel("Month")
-            ax1.set_ylabel("Value")
-            ax1.set_title(f"Monthly Consumption and Cost Comparison ({year})")
-            ax1.set_xticks(x)
-            ax1.set_xticklabels(months, rotation=45)
-            ax1.legend()
-            plt.tight_layout()
-            output_dir = Path("data/visualisations") / "monthly_summary"
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_path = output_dir / f"{year}_monthly_comparison.png"
-            plt.savefig(output_path)
-            plt.close(fig)
-            print(f"Saved monthly comparison chart for {year} to {output_path}")
+            
+        print(f"Found {len(allFiles)} annual summary files.")
+        
+        for dataFile in allFiles:
+            year = dataFile.name.split("_")[0]
+            
+            if dataFile.suffix.lower() == '.jsonl':
+                months = []
+                consumptionTotals = []
+                costTotals = []
+                
+                with open(dataFile, "r") as f:
+                    for line in f:
+                        entry = json.loads(line)
+                        if entry.get("data_type") == "monthly_summary":
+                            monthLabel = entry["month"].split("-")[1]
+                            months.append(monthLabel)
+                            consumptionTotals.append(entry["consumption_total"])
+                            costTotals.append(entry["cost_total"])
+                
+                if months:
+                    yearlyData[year] = {
+                        "months": months,
+                        "consumption": consumptionTotals,
+                        "cost": costTotals
+                    }
+            
+            elif dataFile.suffix.lower() == '.parquet':
+                try:
+                    import pandas as pd
+                    df = pd.read_parquet(dataFile)
+                    monthlyDf = df[df['data_type'] == 'monthly_summary']
+                    
+                    if not monthlyDf.empty:
+                        months = []
+                        for month in monthlyDf['month']:
+                            monthLabel = month.split("-")[1]
+                            months.append(monthLabel)
+                            
+                        yearlyData[year] = {
+                            "months": months,
+                            "consumption": monthlyDf['consumption_total'].tolist(),
+                            "cost": monthlyDf['cost_total'].tolist()
+                        }
+                except Exception as e:
+                    print(f"Error processing parquet file {dataFile}: {str(e)}")
+        
+        if not yearlyData:
+            print("No monthly summary data found in any files.")
+            return False
+            
+        self._create_overlay_charts(yearlyData)
         return True
+        
+    def _create_overlay_charts(self, yearlyData):
+        monthNames = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+        
+        # Create consumption comparison chart
+        plt.figure(figsize=(12, 7))
+        
+        for year, data in sorted(yearlyData.items()):
+            if len(data["months"]) == 0:
+                continue
+                
+            monthIndices = [int(month) - 1 for month in data["months"]]
+            xPositions = range(len(monthIndices))
+            
+            plt.plot(monthIndices, data["consumption"], marker='o', label=year)
+        
+        plt.title("Monthly Consumption Comparison Across Years")
+        plt.xlabel("Month")
+        plt.ylabel("Consumption")
+        plt.xticks(range(12), ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.7)
+        
+        visualisationsDir = Path("data/visualisations") / "monthly_summary"
+        visualisationsDir.mkdir(parents=True, exist_ok=True)
+        consumptionPath = visualisationsDir / "yearly_consumption_comparison.png"
+        plt.tight_layout()
+        plt.savefig(consumptionPath)
+        plt.close()
+        
+        # Create cost comparison chart
+        plt.figure(figsize=(12, 7))
+        
+        for year, data in sorted(yearlyData.items()):
+            if len(data["months"]) == 0:
+                continue
+                
+            monthIndices = [int(month) - 1 for month in data["months"]]
+            xPositions = range(len(monthIndices))
+            
+            plt.plot(monthIndices, data["cost"], marker='o', label=year)
+        
+        plt.title("Monthly Cost Comparison Across Years")
+        plt.xlabel("Month")
+        plt.ylabel("Cost")
+        plt.xticks(range(12), ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.7)
+        
+        costPath = visualisationsDir / "yearly_cost_comparison.png"
+        plt.tight_layout()
+        plt.savefig(costPath)
+        plt.close()
+        
+        print(f"Created overlaid yearly comparison charts:")
+        print(f"- Consumption: {consumptionPath}")
+        print(f"- Cost: {costPath}")
 
     def run(self):
         return self.run_visualization()

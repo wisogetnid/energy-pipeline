@@ -138,12 +138,19 @@ class MenuUI(BaseUI):
     
     def visualisation_menu(self):
         print("\nVisualisation Menu:")
-        print("1. Monthly Consumption/Cost Comparison")
+        print("1. Monthly Consumption/Cost Comparison Across Years")
         print("2. Back to Main Menu")
         choice = self.get_int_input("\nEnter choice (1-2): ", 1, 2)
         if choice == 1:
             from pipeline.ui.visualization_ui import VisualizationUI
-            VisualizationUI().run_monthly_summary_barchart()
+            result = VisualizationUI().run_monthly_summary_barchart()
+            if result:
+                print("\nYearly comparison visualizations have been created successfully.")
+                print("Check the data/visualisations/monthly_summary directory for the charts.")
+            else:
+                print("\nFailed to generate visualizations. Please ensure you have annual summary data files.")
+                print("You may need to run the 'Convert to Yearly JSONL files' option in the Convert Data menu first.")
+            self.wait_for_user()
     
     def wait_for_user(self):
         input("\nPress Enter to continue...")
