@@ -31,10 +31,9 @@ class TestEnergyDataConverter:
         cost_data["resource_classifier"] = "gas.consumption.cost"
         cost_data["resource_unit"] = "pence"
         
-        # Update the readings to have the same timestamps but different values
         cost_readings = []
         for reading in cost_data["readings"]:
-            cost_readings.append([reading[0], reading[1] * 0.15])  # Multiply by price
+            cost_readings.append([reading[0], reading[1] * 0.15])
         cost_data["readings"] = cost_readings
         
         return cost_data
@@ -226,17 +225,14 @@ class TestEnergyDataConverter:
         test_data_dir = tmp_path / "test_matching"
         test_data_dir.mkdir()
         
-        # Create files with filenames matching the expected format in the implementation
         consumption_file = test_data_dir / "electricity_consumption_20250101_to_20250131.json"
         cost_file = test_data_dir / "electricity_cost_20250101_to_20250131.json"
         
         gas_consumption_file = test_data_dir / "gas_consumption_20250101_to_20250131.json"
         gas_cost_file = test_data_dir / "gas_cost_20250101_to_20250131.json"
         
-        # Also add a file without a match to ensure it's not included
         unmatched_file = test_data_dir / "water_consumption_20250101_to_20250131.json"
         
-        # Create test files
         with open(consumption_file, 'w') as f:
             json.dump(electricity_consumption_data, f)
         
@@ -287,14 +283,12 @@ class TestEnergyDataConverter:
         test_data_dir = tmp_path / "test_batch"
         test_data_dir.mkdir()
         
-        # Create test files with matching naming patterns
         elec_consumption_file = test_data_dir / "electricity_consumption_20250101_to_20250131.json"
         elec_cost_file = test_data_dir / "electricity_cost_20250101_to_20250131.json"
         
         gas_consumption_file = test_data_dir / "gas_consumption_20250101_to_20250131.json"
         gas_cost_file = test_data_dir / "gas_cost_20250101_to_20250131.json"
         
-        # Also add an unmatched file to test it's properly ignored
         unmatched_file = test_data_dir / "water_consumption_20250101_to_20250131.json"
         
         with open(elec_consumption_file, 'w') as f:
@@ -322,12 +316,10 @@ class TestEnergyDataConverter:
             water_data["resource_name"] = "water consumption"
             json.dump(water_data, f)
         
-        # Debug prints to help diagnose issues
         print(f"\nFiles in test directory:")
         for file in test_data_dir.glob("*.json"):
             print(f" - {file.name}")
         
-        # Run batch combination using the correct method name
         output_files = converter.batch_combine_resource_files(test_data_dir)
         
         print(f"\nOutput files: {output_files}")
@@ -366,32 +358,27 @@ class TestEnergyDataConverter:
         test_data_dir = tmp_path / "test_all_resources"
         test_data_dir.mkdir()
         
-        # Create test files for electricity
         elec_consumption_file = test_data_dir / "electricity_consumption_20250101_to_20250131.json"
         elec_cost_file = test_data_dir / "electricity_cost_20250101_to_20250131.json"
         
-        # Create test files for gas
         gas_consumption_file = test_data_dir / "gas_consumption_20250101_to_20250131.json"
         gas_cost_file = test_data_dir / "gas_cost_20250101_to_20250131.json"
         
-        # Create electricity files
         with open(elec_consumption_file, 'w') as f:
             json.dump(electricity_consumption_data, f)
         
         with open(elec_cost_file, 'w') as f:
             json.dump(electricity_cost_data, f)
         
-        # Create gas files (based on electricity but with different values)
         with open(gas_consumption_file, 'w') as f:
             gas_data = electricity_consumption_data.copy()
             gas_data["resource_name"] = "gas consumption"
             gas_data["resource_id"] = "20cb0793-1adb-4d7f-92f4-fa30ddbf1f35"
             gas_data["resource_classifier"] = "gas.consumption"
             
-            # Modify readings to have different values
             gas_readings = []
             for reading in gas_data["readings"]:
-                gas_readings.append([reading[0], reading[1] * 0.5])  # Different values
+                gas_readings.append([reading[0], reading[1] * 0.5])
             gas_data["readings"] = gas_readings
             
             json.dump(gas_data, f)
@@ -402,18 +389,15 @@ class TestEnergyDataConverter:
             gas_cost_data["resource_id"] = "e5345576-d775-44cf-bf00-a97b665e6702"
             gas_cost_data["resource_classifier"] = "gas.consumption.cost"
             
-            # Modify readings to have different values
             gas_cost_readings = []
             for reading in gas_cost_data["readings"]:
-                gas_cost_readings.append([reading[0], reading[1] * 0.2])  # Different values
+                gas_cost_readings.append([reading[0], reading[1] * 0.2])
             gas_cost_data["readings"] = gas_cost_readings
             
             json.dump(gas_cost_data, f)
         
-        # Run the correct method name
-        output_file = converter.combine_all_resources_into_single_file(test_data_dir)
+        output_file = converter.combine_all_resources_into_single_file(test_data_dir, split_by_month=False)
         
-        # Verify the output
         assert output_file is not None
         assert Path(output_file).exists()
         
@@ -422,25 +406,38 @@ class TestEnergyDataConverter:
         
         assert len(jsonl_lines) > 0
         
-        # Check the content of the first line
         first_entry = json.loads(jsonl_lines[0])
         
-        # Should have electricity and gas data for the same timestamp
         assert "electricity_consumption" in first_entry
         assert "electricity_cost" in first_entry
         assert "gas_consumption" in first_entry
         assert "gas_cost" in first_entry
         
-        # Should have metadata for both resources
         assert "electricity_consumption_id" in first_entry
         assert "electricity_cost_id" in first_entry
         assert "gas_consumption_id" in first_entry
         assert "gas_cost_id" in first_entry
         
-        # Should have timestamp information
         assert "timestamp" in first_entry
         assert "timestamp_iso" in first_entry
         
-        # Values should match what we expect
         assert first_entry["electricity_consumption_id"] == "04678775-6c72-43c9-8378-c9914756384a"
         assert first_entry["gas_consumption_id"] == "20cb0793-1adb-4d7f-92f4-fa30ddbf1f35"
+        
+        output_files = converter.combine_all_resources_into_single_file(test_data_dir, split_by_month=True)
+        
+        assert output_files is not None
+        assert isinstance(output_files, list)
+        assert len(output_files) > 0
+        
+        for file_path in output_files:
+            assert Path(file_path).exists()
+            
+            with open(file_path, 'r') as f:
+                month_jsonl_lines = f.read().strip().split('\n')
+                assert len(month_jsonl_lines) > 0
+                
+                month_entry = json.loads(month_jsonl_lines[0])
+                assert "electricity_consumption" in month_entry
+                assert "gas_consumption" in month_entry
+                assert "timestamp" in month_entry

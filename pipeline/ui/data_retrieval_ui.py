@@ -5,6 +5,8 @@ import json
 from datetime import datetime, timedelta
 from dateutil import parser
 from pathlib import Path
+import tempfile
+import shutil
 
 from pipeline.ui.base_ui import BaseUI
 from pipeline.data_retrieval import GlowmarktClient, get_historical_readings
@@ -15,7 +17,7 @@ class DataRetrievalUI(BaseUI):
     def __init__(self, client=None):
         super().__init__()
         self.client = client
-        self.client_type = None  # 'glowmarkt' or 'n3rgy'
+        self.client_type = None
         self.selected_entity = None
         self.selected_resource_id = None
         self.selected_resource_name = None
@@ -65,23 +67,19 @@ class DataRetrievalUI(BaseUI):
     def setup_n3rgy_client(self, source_dir=None, output_dir=None):
         self.print_header("N3rgy CSV File Setup")
         
-        # Ask for source directory if not provided
         if not source_dir:
             default_source = "./data/n3rgy_raw"
             source_input = input(f"Enter path to CSV files directory [{default_source}]: ")
             source_dir = source_input if source_input.strip() else default_source
         
-        # Ask for output directory if not provided
         if not output_dir:
             default_output = "./data/processed"
             output_input = input(f"Enter path to save processed files [{default_output}]: ")
             output_dir = output_input if output_input.strip() else default_output
         
-        # Create the client
         try:
             self.client = N3rgyCSVClient(source_dir=source_dir, output_dir=output_dir)
             
-            # Check if source directory exists and has CSV files
             source_path = Path(source_dir)
             if not source_path.exists():
                 print(f"Warning: Source directory {source_dir} does not exist.")
@@ -110,7 +108,6 @@ class DataRetrievalUI(BaseUI):
             print("Error: Client not initialized")
             return False
         
-        # Only applicable for Glowmarkt client
         if self.client_type != 'glowmarkt':
             return True
         
@@ -164,14 +161,12 @@ class DataRetrievalUI(BaseUI):
     def _select_n3rgy_resource(self):
         self.print_header("Resource Selection (N3rgy CSV)")
         
-        # Process all files to generate JSONs
         json_files = self.client.process_all_files(extract_cost=True, combine_to_jsonl=False)
         
         if not json_files:
             print("No resources found or processing failed.")
             return False
         
-        # Group by resource type
         resources = []
         resource_ids = set()
         
@@ -181,7 +176,6 @@ class DataRetrievalUI(BaseUI):
                     data = json.load(f)
                     resource_id = data.get('resource_id')
                     
-                    # Skip if we've already added this resource
                     if resource_id in resource_ids:
                         continue
                     
@@ -295,7 +289,6 @@ class DataRetrievalUI(BaseUI):
         current_month = now.month
         
         if preset:
-            # Update preset mapping since we're changing the options
             choice = {"select_month": 1, "custom": 2}.get(preset, 1)
         else:
             print("Choose a date range:")
@@ -305,9 +298,7 @@ class DataRetrievalUI(BaseUI):
             choice = self.get_int_input("\nSelect a range: ", 1, 2)
         
         if choice == 1:
-            # This is now the "Select month and year" option (previously option 6)
             try:
-                # Display month selection
                 print("\nSelect month:")
                 month_names = [
                     "January", "February", "March", "April", 
@@ -320,7 +311,6 @@ class DataRetrievalUI(BaseUI):
                 
                 month = self.get_int_input("\nEnter month (1-12): ", 1, 12)
                 
-                # Year selection with current year as default
                 print(f"\nEnter year (default: {current_year}):")
                 year_input = input(f"Year [{current_year}]: ")
                 
@@ -336,7 +326,6 @@ class DataRetrievalUI(BaseUI):
                         print("Invalid year format, using current year instead.")
                         year = current_year
                 
-                # Set start and end dates for the selected month and year
                 self.start_date = datetime(year, month, 1)
                 
                 if month == 12:
@@ -351,7 +340,6 @@ class DataRetrievalUI(BaseUI):
                 return False
         
         elif choice == 2:
-            # This is now the "Custom range" option (previously option 5)
             try:
                 start_input = input("\nEnter start date (YYYY-MM-DD): ")
                 self.start_date = parser.parse(start_input)
@@ -375,7 +363,6 @@ class DataRetrievalUI(BaseUI):
         self.print_header("Retrieving Data")
         
         try:
-            # Check if data already exists
             if skip_if_exists:
                 data_dir = self._get_data_directory()
                 resource_name_safe = self.selected_resource_name.lower().replace(" ", "_")
@@ -408,7 +395,7 @@ class DataRetrievalUI(BaseUI):
                     offset=self.offset,
                     batch_days=self.batch_days
                 )
-            else:  # n3rgy
+            else:
                 resource_data = self.client.get_resource_data(
                     self.selected_resource_id,
                     start_date=self.start_date,
@@ -429,7 +416,7 @@ class DataRetrievalUI(BaseUI):
     def _get_data_directory(self):
         if self.client_type == 'glowmarkt':
             data_dir = os.path.join("data", "glowmarkt_api_raw")
-        else:  # n3rgy
+        else:
             data_dir = os.path.join("data", "n3rgy_processed")
         
         os.makedirs(data_dir, exist_ok=True)
@@ -533,22 +520,105 @@ class DataRetrievalUI(BaseUI):
         return None
     
     def fetch_and_combine_resources(self):
-        # First select the data source if not already set
-        if not self.client:
-            if not self.select_data_source():
-                return False
+        self.print_header("Combine Resources")
         
-        # For Glowmarkt, we need to select an entity
-        if self.client_type == 'glowmarkt':
-            if not self.selected_entity:
-                if not self.select_entity():
-                    return False
+        # Ask user to select a directory containing raw JSON files
+        data_dir = Path("data")
+        
+        # Find all subdirectories in data directory that contain JSON files
+        valid_dirs = []
+        for subdir in data_dir.iterdir():
+            if subdir.is_dir() and list(subdir.glob("*.json")):
+                valid_dirs.append(subdir)
+        
+        if not valid_dirs:
+            print("No directories with JSON files found in 'data' folder.")
+            return False
+        
+        print("\nAvailable data sources:")
+        for i, directory in enumerate(valid_dirs, 1):
+            json_count = len(list(directory.glob("*.json")))
+            print(f"{i}. {directory.name} ({json_count} JSON files)")
+        
+        if self.client:
+            print(f"{len(valid_dirs) + 1}. Use current {self.client_type} client to fetch new data")
+        
+        max_option = len(valid_dirs) + (1 if self.client else 0)
+        choice = self.get_int_input("\nSelect data source: ", 1, max_option)
+        
+        # Use existing client to fetch new data
+        if self.client and choice == len(valid_dirs) + 1:
+            if self.client_type == 'glowmarkt':
+                if not self.selected_entity:
+                    if not self.select_entity():
+                        return False
+                return self._fetch_and_combine_glowmarkt_resources()
+            else:  # n3rgy
+                return self._fetch_and_combine_n3rgy_resources()
+        
+        # Process existing JSON files from selected directory
+        selected_dir = valid_dirs[choice - 1]
+        return self._process_existing_json_files(selected_dir)
+
+    def _process_existing_json_files(self, directory):
+        self.print_header(f"Processing Files from {directory.name}")
+        
+        # Create a temporary directory for this run's files
+        temp_dir = Path(tempfile.mkdtemp(prefix="energy_data_"))
+        print(f"\nCreating temporary directory for data processing: {temp_dir}")
+        
+        # Get all JSON files in the directory
+        json_files = list(directory.glob("*.json"))
+        print(f"\nFound {len(json_files)} JSON files in {directory}")
+        
+        # Filter to show only resource types
+        resource_types = set()
+        for json_file in json_files:
+            filename = json_file.name.lower()
+            if "electricity" in filename:
+                resource_types.add("electricity")
+            elif "gas" in filename:
+                resource_types.add("gas")
+            elif "water" in filename:
+                resource_types.add("water")
+        
+        print(f"Resource types found: {', '.join(resource_types)}")
+        
+        # Copy relevant files to the temp directory
+        retrieved_files = []
+        for json_file in json_files:
+            temp_filepath = temp_dir / json_file.name
             
-            # Continue with Glowmarkt flow
-            return self._fetch_and_combine_glowmarkt_resources()
-        else:
-            # For N3rgy, we can directly process all files
-            return self._fetch_and_combine_n3rgy_resources()
+            # Copy the file to the temp directory
+            with open(json_file, 'r') as src_file, open(temp_filepath, 'w') as dst_file:
+                dst_file.write(src_file.read())
+            
+            retrieved_files.append(str(temp_filepath))
+        
+        # Get date range for user information
+        try:
+            from_date = "unknown"
+            to_date = "unknown"
+            for json_file in json_files:
+                with open(json_file, 'r') as f:
+                    data = json.load(f)
+                    from_date_value = data.get("start_date", data.get("query", {}).get("from", None))
+                    to_date_value = data.get("end_date", data.get("query", {}).get("to", None))
+                    if from_date_value and from_date == "unknown":
+                        from_date = from_date_value
+                    if to_date_value and to_date == "unknown":
+                        to_date = to_date_value
+            
+            if isinstance(from_date, str) and 'T' in from_date:
+                from_date = from_date.split('T')[0]
+            if isinstance(to_date, str) and 'T' in to_date:
+                to_date = to_date.split('T')[0]
+                
+            print(f"Date range found: {from_date} to {to_date}")
+        except Exception as e:
+            print(f"Could not determine date range: {e}")
+        
+        return self._process_combined_files(retrieved_files, [], [], temp_dir)
     
     def _fetch_and_combine_glowmarkt_resources(self):
         if not self.select_time_range():
@@ -584,7 +654,6 @@ class DataRetrievalUI(BaseUI):
             skipped_resources = []
             
             # Create a temporary directory specifically for this run's files
-            import tempfile
             temp_dir = Path(tempfile.mkdtemp(prefix="energy_data_"))
             print(f"\nCreating temporary directory for data processing: {temp_dir}")
             
@@ -682,27 +751,52 @@ class DataRetrievalUI(BaseUI):
             for filepath in retrieved_files:
                 print(f"- {Path(filepath).name}")
             
-            print("\nCombining just this run's resources into a single file...")
+            print("\nHow would you like to combine these resources?")
+            print("1. Create a single combined file for all data")
+            print("2. Create separate combined files for each month")
+            
+            choice = self.get_int_input("\nSelect an option: ", 1, 2)
+            split_by_month = (choice == 2)
+            
+            print("\nCombining resources into a single file...")
             from pipeline.data_processing.jsonl_converter import EnergyDataConverter
             
             # Use our temporary directory that only contains files from this run
             output_dir = Path("data/processed")
             
             converter = EnergyDataConverter(output_dir=output_dir)
-            combined_filepath = converter.combine_all_resources_into_single_file(temp_dir)
+            combined_filepath = converter.combine_all_resources_into_single_file(
+                temp_dir, 
+                split_by_month=split_by_month
+            )
             
             if combined_filepath:
-                print(f"\nAll resources successfully combined into a single file: {combined_filepath}")
-                
-                print("\nConverting combined file to Parquet format...")
-                from pipeline.data_processing.parquet_converter import JsonlToParquetConverter
-                
-                parquet_dir = Path("data/parquet")
-                parquet_converter = JsonlToParquetConverter(output_dir=str(parquet_dir))
-                parquet_filepath = parquet_converter.convert_jsonl_to_parquet_file(combined_filepath)
-                
-                if parquet_filepath:
-                    print(f"\nSuccessfully converted to Parquet format: {parquet_filepath}")
+                if isinstance(combined_filepath, list):
+                    print(f"\nAll resources successfully combined into {len(combined_filepath)} monthly files:")
+                    for filepath in combined_filepath:
+                        print(f"- {filepath}")
+                    
+                    # Ask which file to convert to Parquet
+                    print("\nWould you like to convert these files to Parquet format?")
+                    convert_to_parquet = self.get_yes_no_input("Convert to Parquet? (y/n): ")
+                    
+                    if convert_to_parquet:
+                        from pipeline.data_processing.parquet_converter import JsonlToParquetConverter
+                        
+                        parquet_dir = Path("data/parquet")
+                        parquet_converter = JsonlToParquetConverter(output_dir=str(parquet_dir))
+                        
+                        parquet_filepaths = []
+                        for jsonl_file in combined_filepath:
+                            print(f"\nConverting {Path(jsonl_file).name} to Parquet...")
+                            parquet_filepath = parquet_converter.convert_jsonl_to_parquet_file(jsonl_file)
+                            if parquet_filepath:
+                                parquet_filepaths.append(parquet_filepath)
+                        
+                        if parquet_filepaths:
+                            print(f"\nSuccessfully converted {len(parquet_filepaths)} files to Parquet format:")
+                            for filepath in parquet_filepaths:
+                                print(f"- {filepath}")
                     
                     # Get the original paths, not the temp ones, for returning
                     original_paths = []
@@ -717,14 +811,41 @@ class DataRetrievalUI(BaseUI):
                     shutil.rmtree(temp_dir)
                     print(f"\nTemporary directory removed: {temp_dir}")
                     
-                    return [parquet_filepath, combined_filepath, *original_paths]
+                    return [*combined_filepath, *original_paths]
                 else:
-                    # Delete the temporary directory
-                    import shutil
-                    shutil.rmtree(temp_dir)
-                    print(f"\nTemporary directory removed: {temp_dir}")
+                    print(f"\nAll resources successfully combined into a single file: {combined_filepath}")
                     
-                    return [combined_filepath, *original_paths]
+                    print("\nConverting combined file to Parquet format...")
+                    from pipeline.data_processing.parquet_converter import JsonlToParquetConverter
+                    
+                    parquet_dir = Path("data/parquet")
+                    parquet_converter = JsonlToParquetConverter(output_dir=str(parquet_dir))
+                    parquet_filepath = parquet_converter.convert_jsonl_to_parquet_file(combined_filepath)
+                    
+                    if parquet_filepath:
+                        print(f"\nSuccessfully converted to Parquet format: {parquet_filepath}")
+                        
+                        # Get the original paths, not the temp ones, for returning
+                        original_paths = []
+                        data_dir = self._get_data_directory()
+                        for temp_path in retrieved_files:
+                            filename = Path(temp_path).name
+                            original_path = os.path.join(data_dir, filename)
+                            original_paths.append(original_path)
+                        
+                        # Delete the temporary directory
+                        import shutil
+                        shutil.rmtree(temp_dir)
+                        print(f"\nTemporary directory removed: {temp_dir}")
+                        
+                        return [parquet_filepath, combined_filepath, *original_paths]
+                    else:
+                        # Delete the temporary directory
+                        import shutil
+                        shutil.rmtree(temp_dir)
+                        print(f"\nTemporary directory removed: {temp_dir}")
+                        
+                        return [combined_filepath, *original_paths]
             else:
                 # Delete the temporary directory
                 import shutil

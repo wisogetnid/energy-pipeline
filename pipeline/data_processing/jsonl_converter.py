@@ -5,6 +5,9 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any, Tuple
+import re
+import calendar
+from dateutil import parser
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -236,7 +239,7 @@ class EnergyDataConverter:
         logger.info(f"Combined {entries_written} readings into JSONL format at {output_file}")
         return str(output_file)
     
-    def find_matching_resource_files(self, directory: Union[str, Path] = "data/glowmarkt_api_raw") -> List[Tuple[str, str]]:
+    def find_matching_resource_files(self, directory: Union[str, Path]) -> List[Tuple[str, str]]:
         directory = Path(directory)
         all_files = list(directory.glob("*.json"))
         
@@ -244,27 +247,34 @@ class EnergyDataConverter:
         cost_files_by_key = {}
         
         for file_path in all_files:
-            filename = file_path.name
+            filename = file_path.name.lower()
             
-            if "electricity" in filename.lower():
+            if "electricity" in filename:
                 resource_type = "electricity"
-            elif "gas" in filename.lower():
+            elif "gas" in filename:
                 resource_type = "gas"
-            elif "water" in filename.lower():
+            elif "water" in filename:
                 resource_type = "water"
             else:
                 resource_type = "unknown"
             
-            filename_parts = filename.split('_')
-            if len(filename_parts) >= 3:
-                date_range = '_'.join(filename_parts[2:]).replace('.json', '')
-                
-                file_key = f"{resource_type}_{date_range}"
-                
-                if "consumption" in filename.lower():
-                    consumption_files_by_key[file_key] = str(file_path)
-                elif "cost" in filename.lower():
-                    cost_files_by_key[file_key] = str(file_path)
+            date_range = None
+            
+            date_pattern = r'(\d{8})_to_(\d{8})'
+            match = re.search(date_pattern, filename)
+            if match:
+                date_range = f"{match.group(1)}_to_{match.group(2)}"
+            
+            if not date_range:
+                base_name = filename.replace("consumption", "").replace("cost", "").replace(".json", "")
+                date_range = base_name
+            
+            file_key = f"{resource_type}_{date_range}"
+            
+            if "consumption" in filename:
+                consumption_files_by_key[file_key] = str(file_path)
+            elif "cost" in filename:
+                cost_files_by_key[file_key] = str(file_path)
         
         matching_file_pairs = []
         
@@ -272,6 +282,7 @@ class EnergyDataConverter:
             if file_key in cost_files_by_key:
                 matching_file_pairs.append((consumption_files_by_key[file_key], cost_files_by_key[file_key]))
         
+        logger.info(f"Found {len(matching_file_pairs)} matching consumption-cost file pairs in {directory}")
         return matching_file_pairs
     
     def batch_combine_resource_files(
@@ -330,31 +341,15 @@ class EnergyDataConverter:
     def combine_all_resources_into_single_file(
         self,
         directory: Union[str, Path] = "data/glowmarkt_api_raw",
-        output_file: Optional[Union[str, Path]] = None
-    ) -> str:
+        output_file: Optional[Union[str, Path]] = None,
+        split_by_month: bool = True
+    ) -> Union[str, List[str]]:
         directory = Path(directory)
         matching_file_pairs = self.find_matching_resource_files(directory)
         
         if not matching_file_pairs:
             logger.warning(f"No matching consumption-cost pairs found in {directory}")
             return None
-        
-        if output_file is None:
-            first_consumption_file = matching_file_pairs[0][0]
-            first_data = self.load_json_from_file(first_consumption_file)
-            
-            from_date = first_data.get("query", {}).get("from", first_data.get("start_date", "unknown"))
-            to_date = first_data.get("query", {}).get("to", first_data.get("end_date", "unknown"))
-            
-            start_date_str = from_date.split("T")[0].replace("-", "") if isinstance(from_date, str) else "unknown"
-            end_date_str = to_date.split("T")[0].replace("-", "") if isinstance(to_date, str) else "unknown"
-            
-            filename = f"all_resources_{start_date_str}_to_{end_date_str}.jsonl"
-            output_file = self.output_dir / filename
-        else:
-            output_file = Path(output_file)
-        
-        output_file.parent.mkdir(parents=True, exist_ok=True)
         
         combined_readings_by_timestamp = {}
         resource_metadata_by_type = {}
@@ -391,12 +386,101 @@ class EnergyDataConverter:
             consolidated_metadata[f"{resource_type}_cost_unit"] = metadata["cost_unit"]
             consolidated_metadata[f"{resource_type}_cost_classifier"] = metadata["cost_classifier"]
         
-        entries_written = 0
-        with open(output_file, 'w') as file_handle:
-            for timestamp, reading in sorted(combined_readings_by_timestamp.items()):
-                data_object = {**consolidated_metadata, **reading}
-                file_handle.write(json.dumps(data_object) + '\n')
-                entries_written += 1
+        if not split_by_month:
+            if output_file is None:
+                first_consumption_file = matching_file_pairs[0][0]
+                first_data = self.load_json_from_file(first_consumption_file)
+                
+                from_date = first_data.get("query", {}).get("from", first_data.get("start_date", "unknown"))
+                to_date = first_data.get("query", {}).get("to", first_data.get("end_date", "unknown"))
+                
+                start_date_str = from_date.split("T")[0].replace("-", "") if isinstance(from_date, str) else "unknown"
+                end_date_str = to_date.split("T")[0].replace("-", "") if isinstance(to_date, str) else "unknown"
+                
+                filename = f"all_resources_{start_date_str}_to_{end_date_str}.jsonl"
+                output_file = self.output_dir / filename
+            else:
+                output_file = Path(output_file)
+            
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            entries_written = 0
+            with open(output_file, 'w') as file_handle:
+                for timestamp, reading in sorted(combined_readings_by_timestamp.items()):
+                    data_object = {**consolidated_metadata, **reading}
+                    file_handle.write(json.dumps(data_object) + '\n')
+                    entries_written += 1
+            
+            logger.info(f"Combined {entries_written} readings across {len(resource_metadata_by_type)} resource types into JSONL format at {output_file}")
+            return str(output_file)
         
-        logger.info(f"Combined {entries_written} readings across {len(resource_metadata_by_type)} resource types into JSONL format at {output_file}")
-        return str(output_file)
+        readings_by_month = {}
+        output_files = []
+        
+        for timestamp, reading in combined_readings_by_timestamp.items():
+            try:
+                timestamp_value = timestamp
+                if isinstance(timestamp_value, (int, float)):
+                    timestamp_seconds = timestamp_value / 1000 if timestamp_value > 9999999999 else timestamp_value
+                    date_time = datetime.fromtimestamp(timestamp_seconds)
+                elif isinstance(timestamp_value, str) and 'T' in timestamp_value:
+                    date_time = datetime.fromisoformat(timestamp_value.replace('Z', '+00:00'))
+                else:
+                    date_time = parser.parse(str(timestamp_value))
+                    
+                month_key = f"{date_time.year}-{date_time.month:02d}"
+                
+                if month_key not in readings_by_month:
+                    readings_by_month[month_key] = []
+                
+                readings_by_month[month_key].append((timestamp, reading))
+            except Exception as e:
+                logger.warning(f"Could not parse timestamp {timestamp}: {e}")
+                if 'unknown' not in readings_by_month:
+                    readings_by_month['unknown'] = []
+                readings_by_month['unknown'].append((timestamp, reading))
+        
+        for month_key, readings in readings_by_month.items():
+            if not readings:
+                continue
+                
+            if month_key == 'unknown':
+                month_filename = f"all_resources_unknown_dates.jsonl"
+            else:
+                year, month = month_key.split('-')
+                month_start = f"{year}{month}01"
+                
+                if month == '12':
+                    next_year = str(int(year) + 1)
+                    next_month = '01'
+                else:
+                    next_year = year
+                    next_month = f"{int(month) + 1:02d}"
+                
+                _, last_day = calendar.monthrange(int(year), int(month))
+                month_end = f"{year}{month}{last_day}"
+                
+                month_filename = f"all_resources_{month_start}_to_{month_end}.jsonl"
+            
+            month_output_file = self.output_dir / month_filename
+            month_output_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            month_metadata = consolidated_metadata.copy()
+            if month_key != 'unknown':
+                year, month = month_key.split('-')
+                _, last_day = calendar.monthrange(int(year), int(month))
+                month_metadata["from_date"] = f"{year}-{month}-01T00:00:00.000Z"
+                month_metadata["to_date"] = f"{year}-{month}-{last_day}T23:59:59.999Z"
+            
+            entries_written = 0
+            with open(month_output_file, 'w') as file_handle:
+                for timestamp, reading in sorted(readings):
+                    data_object = {**month_metadata, **reading}
+                    file_handle.write(json.dumps(data_object) + '\n')
+                    entries_written += 1
+            
+            logger.info(f"Created monthly file for {month_key} with {entries_written} readings at {month_output_file}")
+            output_files.append(str(month_output_file))
+        
+        logger.info(f"Split data into {len(output_files)} monthly files in {self.output_dir}")
+        return output_files
