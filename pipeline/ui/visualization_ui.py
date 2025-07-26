@@ -3,136 +3,98 @@ import glob
 from pathlib import Path
 import matplotlib.pyplot as plt
 import json
-
 from pipeline.ui.base_ui import BaseUI
 from pipeline.data_visualisation.energy_efficiency import generate_consumption_patterns, generate_weekly_comparison, generate_weekday_weekend_pattern, load_and_process_consumption_data
-
 class VisualizationUI(BaseUI):
-    
     def __init__(self):
         super().__init__()
         self.data_dir = Path("data/processed")
         self.output_dir = Path("data/visualisations")
-    
     def find_consumption_files(self):
         all_files = glob.glob(str(self.data_dir / "*_consumption_*.parquet"))
         if not all_files:
             all_files = glob.glob(str(self.data_dir / "*_consumption_*.jsonl"))
-        
         resources = {}
-        
         for file_path in all_files:
             file_name = os.path.basename(file_path)
             resource_name = file_name.split('_')[0]
             date_part = '_'.join(file_name.split('_')[2:]).replace('.parquet', '').replace('.jsonl', '')
-            
             key = f"{resource_name}_{date_part}"
             resources[key] = file_path
-        
         return resources
-    
     def run_visualization(self):
         self.print_header("Energy Efficiency Visualization")
-        
         consumption_files = self.find_consumption_files()
-        
         if not consumption_files:
             print("No consumption data files found. Please retrieve and convert data first.")
             return False
-        
         print("\nAvailable consumption data for visualization:")
-        
         file_items = list(consumption_files.items())
         for i, (key, file_path) in enumerate(file_items, 1):
             resource_name = key.split('_')[0]
             date_part = '_'.join(key.split('_')[1:])
             print(f"{i}. {resource_name} ({date_part})")
-        
         print("\nOptions:")
         print("1. Visualize a specific resource")
         print("2. Visualize all resources")
         print("3. Go back")
-        
         choice = self.get_int_input("\nEnter your choice: ", 1, 3)
-        
         if choice == 1:
             file_idx = self.get_int_input("Enter resource number: ", 1, len(file_items))
             selected_key, selected_file = file_items[file_idx - 1]
-            
             return self.generate_efficiency_charts(selected_file, selected_key)
-                
         elif choice == 2:
             success_count = 0
             for key, file_path in file_items:
                 result = self.generate_efficiency_charts(file_path, key)
                 if result:
                     success_count += 1
-            
             print(f"\nGenerated visualizations for {success_count} out of {len(file_items)} resources.")
             print(f"Visualizations are saved in separate folders under {self.output_dir}")
             return success_count > 0
-                
         elif choice == 3:
             return False
-        
         return False
-    
     def generate_efficiency_charts(self, consumption_file_path, resource_key):
         output_folder = self.output_dir / resource_key
         output_folder.mkdir(parents=True, exist_ok=True)
-        
         try:
             df, resource_type, unit = load_and_process_consumption_data(consumption_file_path)
-            
             print(f"\nGenerating consumption patterns for {resource_type}...")
             pattern_file = generate_consumption_patterns(df, resource_type, unit, output_folder)
-            
             print(f"Generating weekly comparison for {resource_type}...")
             weekly_file = generate_weekly_comparison(df, resource_type, unit, output_folder)
-            
             print(f"Generating weekday vs weekend patterns for {resource_type}...")
             weekday_weekend_file = generate_weekday_weekend_pattern(df, resource_type, unit, output_folder)
-            
             print(f"Visualizations saved to {output_folder}")
             return True
-            
         except Exception as e:
             print(f"Error generating visualizations: {str(e)}")
             return False
-    
     def run_monthly_summary_barchart(self):
         self.print_header("Monthly Consumption/Cost Comparison")
-        
         jsonlSummaryFiles = sorted(Path("data/processed").glob("*_annual_energy_summary.jsonl"))
         parquetProcessedFiles = sorted(Path("data/processed").glob("*_annual_energy_summary.parquet"))
         parquetDirFiles = sorted(Path("data/parquet").glob("*_annual_energy_summary.parquet"))
-        
         allFiles = []
         yearlyData = {}
-        
         if jsonlSummaryFiles:
             allFiles.extend(jsonlSummaryFiles)
-            
         if parquetProcessedFiles or parquetDirFiles:
             allParquetFiles = parquetProcessedFiles + parquetDirFiles
             allFiles.extend(allParquetFiles)
-        
         if not allFiles:
             print("No annual summary files found in data/processed or data/parquet.")
             return False
-            
         print(f"Found {len(allFiles)} annual summary files.")
-        
         for dataFile in allFiles:
             year = dataFile.name.split("_")[0]
-            
             if dataFile.suffix.lower() == '.jsonl':
                 months = []
                 consumptionTotals = []
                 costTotals = []
                 resource_consumptions = {}
                 resource_costs = {}
-                
                 with open(dataFile, "r") as f:
                     for line in f:
                         entry = json.loads(line)
@@ -152,7 +114,6 @@ class VisualizationUI(BaseUI):
                                     if resource not in resource_costs:
                                         resource_costs[resource] = []
                                     resource_costs[resource].append(v)
-                
                 if months:
                     yearlyData[year] = {
                         "months": months,
@@ -161,13 +122,11 @@ class VisualizationUI(BaseUI):
                         "resource_consumptions": resource_consumptions,
                         "resource_costs": resource_costs
                     }
-            
             elif dataFile.suffix.lower() == '.parquet':
                 try:
                     import pandas as pd
                     df = pd.read_parquet(dataFile)
                     monthlyDf = df[df['data_type'] == 'monthly_summary']
-                    
                     if not monthlyDf.empty:
                         months = []
                         resource_consumptions = {}
@@ -193,14 +152,11 @@ class VisualizationUI(BaseUI):
                         }
                 except Exception as e:
                     print(f"Error processing parquet file {dataFile}: {str(e)}")
-        
         if not yearlyData:
             print("No monthly summary data found in any files.")
             return False
-            
         self._create_overlay_charts(yearlyData)
         return True
-        
     def _create_overlay_charts(self, yearlyData):
         import numpy as np
         import matplotlib.pyplot as plt
@@ -220,14 +176,12 @@ class VisualizationUI(BaseUI):
         year_resource_cost_month = {}
         for year, data in yearlyData.items():
             months = data["months"]
-            # Map month label to index
             month_to_idx = {m: i for i, m in enumerate(monthNames)}
             year_resource_month[year] = {}
             year_resource_cost_month[year] = {}
             for resource in resource_keys:
                 values = [0] * 12
                 cost_values = [0] * 12
-                # Fill values by month index
                 if 'resource_consumptions' in data and resource in data['resource_consumptions']:
                     for i, m in enumerate(months):
                         idx = month_to_idx.get(m, None)
@@ -240,14 +194,26 @@ class VisualizationUI(BaseUI):
                             cost_values[idx] = data['resource_costs'][resource][i]
                 year_resource_month[year][resource] = values
                 year_resource_cost_month[year][resource] = cost_values
-        # Plot stacked bar chart for consumption
+        print("\nTotal energy consumption per resource (last 12 months):")
+        from collections import defaultdict
+        resource_months = defaultdict(list)
+        for year in sorted(year_resource_month.keys()):
+            for month_idx in range(12):
+                for resource in resource_keys:
+                    value = year_resource_month[year][resource][month_idx]
+                    resource_months[resource].append(((int(year), month_idx+1), value))
+        for resource in resource_keys:
+            sorted_months = sorted(resource_months[resource], key=lambda x: (x[0][0], x[0][1]))
+            last12 = [v for (_, v) in sorted_months if v is not None][-12:]
+            total = sum(last12)
+            print(f"  {resource}: {total:.2f}")
         plt.figure(figsize=(14, 8))
         bar_width = 0.7 / max(1, len(year_resource_month))
         x = np.arange(12)
-        for idx, (year, resource_months) in enumerate(sorted(year_resource_month.items())):
+        for idx, (year, resource_months_) in enumerate(sorted(year_resource_month.items())):
             bottom = np.zeros(12)
             for resource in resource_keys:
-                vals = resource_months[resource]
+                vals = resource_months_[resource]
                 plt.bar(x + idx * bar_width, vals, bar_width, label=f"{year} {resource}", bottom=bottom)
                 bottom += np.array(vals)
         plt.title("Monthly Resource Consumption Comparison (Stacked by Resource)")
@@ -262,7 +228,6 @@ class VisualizationUI(BaseUI):
         plt.tight_layout()
         plt.savefig(consumptionPath)
         plt.close()
-        # Plot stacked bar chart for cost
         plt.figure(figsize=(14, 8))
         for idx, (year, resource_cost_months) in enumerate(sorted(year_resource_cost_month.items())):
             bottom = np.zeros(12)
@@ -280,18 +245,14 @@ class VisualizationUI(BaseUI):
         plt.tight_layout()
         plt.savefig(costStackedPath)
         plt.close()
-        # Cost as line chart for each year (legacy)
         plt.figure(figsize=(12, 7))
         for year, data in sorted(yearlyData.items()):
             if len(data.get("months", [])) == 0:
                 continue
-            # Pad cost to 12 months, matching month indices
             cost_padded = [0] * 12
             months = data["months"]
-            # If 'cost' is missing or all zeros, sum per-resource costs
             costs = data.get("cost", None)
             if not costs or all(c == 0 for c in costs):
-                # Sum per-resource costs for each month
                 resource_costs = data.get("resource_costs", {})
                 for i, m in enumerate(months):
                     try:
@@ -322,7 +283,6 @@ class VisualizationUI(BaseUI):
         plt.tight_layout()
         plt.savefig(costPath)
         plt.close()
-        # Improved: Use different shades for stacks of the same bar (per year)
         import matplotlib.colors as mcolors
         plt.figure(figsize=(14, 8))
         base_colors = list(mcolors.TABLEAU_COLORS.values())
@@ -330,14 +290,13 @@ class VisualizationUI(BaseUI):
         bar_width = 0.7 / max(1, len(year_list))
         x = np.arange(12)
         for idx, year in enumerate(year_list):
-            resource_months = year_resource_month[year]
+            resource_months_ = year_resource_month[year]
             bottom = np.zeros(12)
             base_color = base_colors[idx % len(base_colors)]
-            # Generate shades for each resource
             n_resources = len(resource_keys)
             shades = [mcolors.to_rgba(base_color, alpha=0.7 - 0.5 * (i / max(1, n_resources-1))) for i in range(n_resources)]
             for r_idx, resource in enumerate(resource_keys):
-                vals = resource_months[resource]
+                vals = resource_months_[resource]
                 plt.bar(x + idx * bar_width, vals, bar_width, label=f"{year} {resource}", bottom=bottom, color=shades[r_idx])
                 bottom += np.array(vals)
         plt.title("Monthly Resource Consumption Comparison (Stacked by Resource)")
@@ -350,7 +309,6 @@ class VisualizationUI(BaseUI):
         plt.tight_layout()
         plt.savefig(consumptionPath)
         plt.close()
-        # Improved: Use different shades for cost stacks as well
         plt.figure(figsize=(14, 8))
         for idx, year in enumerate(year_list):
             resource_cost_months = year_resource_cost_month[year]
@@ -376,21 +334,14 @@ class VisualizationUI(BaseUI):
         print(f"- Resource Consumption (stacked): {consumptionPath}")
         print(f"- Resource Cost (stacked): {costStackedPath}")
         print(f"- Cost (line): {costPath}")
-
     def compare_theoretical_costs_cli(self):
-        """
-        CLI: Compare actual monthly cost with a theoretical cost using user-supplied rates for electricity and gas.
-        Uses the last 12 months of data found in JSONL summary files.
-        """
         import calendar
         from collections import defaultdict
-        # Only use JSONL summary files
         jsonlSummaryFiles = sorted(Path("data/processed").glob("*_annual_energy_summary.jsonl"))
         if not jsonlSummaryFiles:
             print("No annual summary JSONL files found in data/processed.")
             return False
-        # Collect all months across all years
-        month_entries = []  # List of (year, month, resource_consumptions, resource_costs)
+        month_entries = []
         for dataFile in jsonlSummaryFiles:
             year = dataFile.name.split("_")[0]
             with open(dataFile, "r") as f:
@@ -399,7 +350,6 @@ class VisualizationUI(BaseUI):
                     if entry.get("data_type") == "monthly_summary":
                         monthLabel = entry["month"].split("-")[1]
                         monthNum = int(monthLabel)
-                        # Collect per-resource
                         resource_consumptions = {}
                         resource_costs = {}
                         for k, v in entry.items():
@@ -413,17 +363,13 @@ class VisualizationUI(BaseUI):
         if not month_entries:
             print("No monthly summary data found in any JSONL files.")
             return False
-        # Sort by (year, month)
         month_entries.sort()
-        # Take last 12
         last_12 = month_entries[-12:]
-        # Prompt for 4 rates, with units
         print("\nEnter new rates:")
         elec_standing = self.get_float_input("Electricity standing charge (pence per day): ")
         elec_unit = self.get_float_input("Electricity unit rate (pence per kWh): ")
         gas_standing = self.get_float_input("Gas standing charge (pence per day): ")
         gas_unit = self.get_float_input("Gas unit rate (pence per kWh): ")
-        # Prepare
         actual_costs = {"electricity": [], "gas": []}
         theoretical_costs = {"electricity": [], "gas": []}
         xlabels = []
@@ -439,18 +385,15 @@ class VisualizationUI(BaseUI):
                     theo = (consumption * gas_unit) + (gas_standing * calendar.monthrange(year, month)[1])
                 actual_costs[resource].append(actual)
                 theoretical_costs[resource].append(theo)
-        # Plot
         import matplotlib.pyplot as plt
         plt.figure(figsize=(15,8))
         x = range(12)
         for resource, color in zip(["electricity", "gas"], ["tab:blue", "tab:orange"]):
             plt.plot(x, actual_costs[resource], marker='o', label=f'Actual {resource.capitalize()} Cost', color=color)
             plt.plot(x, theoretical_costs[resource], marker='o', linestyle='--', label=f'Theoretical {resource.capitalize()} Cost', color=color, alpha=0.6)
-            # Annotate each point with value
             for i in x:
                 plt.annotate(f"{actual_costs[resource][i]:.2f}", (i, actual_costs[resource][i]), textcoords="offset points", xytext=(0,6), ha='center', fontsize=8, color=color)
                 plt.annotate(f"{theoretical_costs[resource][i]:.2f}", (i, theoretical_costs[resource][i]), textcoords="offset points", xytext=(0,-12), ha='center', fontsize=8, color=color, alpha=0.7)
-        # Show input values on plot
         input_text = (
             f"Electricity standing: {elec_standing} £/day\n"
             f"Electricity unit: {elec_unit} £/kWh\n"
@@ -472,20 +415,13 @@ class VisualizationUI(BaseUI):
         plt.close()
         print(f"\nComparison chart saved to: {outpath}")
         return True
-
     def compare_theoretical_costs_multi_plans_cli(self):
-        """
-        CLI: Compare actual monthly cost with theoretical costs using user-supplied rates for multiple energy plans.
-        Uses the last 12 months of data found in JSONL summary files.
-        """
         import calendar
-        # Only use JSONL summary files
         jsonlSummaryFiles = sorted(Path("data/processed").glob("*_annual_energy_summary.jsonl"))
         if not jsonlSummaryFiles:
             print("No annual summary JSONL files found in data/processed.")
             return False
-        # Collect all months across all years
-        month_entries = []  # List of (year, month, resource_consumptions, resource_costs)
+        month_entries = []
         for dataFile in jsonlSummaryFiles:
             year = dataFile.name.split("_")[0]
             with open(dataFile, "r") as f:
@@ -494,7 +430,6 @@ class VisualizationUI(BaseUI):
                     if entry.get("data_type") == "monthly_summary":
                         monthLabel = entry["month"].split("-")[1]
                         monthNum = int(monthLabel)
-                        # Collect per-resource
                         resource_consumptions = {}
                         resource_costs = {}
                         for k, v in entry.items():
@@ -508,11 +443,8 @@ class VisualizationUI(BaseUI):
         if not month_entries:
             print("No monthly summary data found in any JSONL files.")
             return False
-        # Sort by (year, month)
         month_entries.sort()
-        # Take last 12
         last_12 = month_entries[-12:]
-        # Prompt for number of plans
         num_plans = self.get_int_input("How many energy plans do you want to compare? (1-5): ", 1, 5)
         plans = []
         for i in range(num_plans):
@@ -529,7 +461,6 @@ class VisualizationUI(BaseUI):
                 'gas_standing': gas_standing,
                 'gas_unit': gas_unit
             })
-        # Prepare actual costs
         actual_costs = {"electricity": [], "gas": []}
         xlabels = []
         for year, month, resource_consumptions, resource_costs in last_12:
@@ -539,8 +470,7 @@ class VisualizationUI(BaseUI):
                 consumption = resource_consumptions.get(resource, 0)
                 actual = resource_costs.get(resource, 0)
                 actual_costs[resource].append(actual)
-        # Calculate theoretical costs for each plan
-        theoretical_costs = []  # List of dicts, one per plan
+        theoretical_costs = []
         for plan in plans:
             plan_costs = {"electricity": [], "gas": []}
             for idx, (year, month, resource_consumptions, resource_costs) in enumerate(last_12):
@@ -552,16 +482,13 @@ class VisualizationUI(BaseUI):
                         theo = (consumption * plan['gas_unit']) + (plan['gas_standing'] * calendar.monthrange(year, month)[1])
                     plan_costs[resource].append(theo)
             theoretical_costs.append(plan_costs)
-        # Plot
         import matplotlib.pyplot as plt
         plt.figure(figsize=(15,8))
         x = range(12)
-        # Plot actual costs
         for resource, color in zip(["electricity", "gas"], ["tab:blue", "tab:orange"]):
             plt.plot(x, actual_costs[resource], marker='o', label=f'Actual {resource.capitalize()} Cost', color=color)
             for i in x:
                 plt.annotate(f"{actual_costs[resource][i]:.2f}", (i, actual_costs[resource][i]), textcoords="offset points", xytext=(0,6), ha='center', fontsize=8, color=color)
-        # Plot each plan
         plan_colors = ["tab:green", "tab:red", "tab:purple", "tab:brown", "tab:gray"]
         for pidx, plan in enumerate(plans):
             color = plan_colors[pidx % len(plan_colors)]
@@ -571,7 +498,6 @@ class VisualizationUI(BaseUI):
                 plt.plot(x, theoretical_costs[pidx][resource], marker='o', linestyle=linestyle, label=label, color=color, alpha=0.7)
                 for i in x:
                     plt.annotate(f"{theoretical_costs[pidx][resource][i]:.2f}", (i, theoretical_costs[pidx][resource][i]), textcoords="offset points", xytext=(0,-12-10*pidx), ha='center', fontsize=8, color=color, alpha=0.7)
-        # Show all plan inputs on plot
         input_text = "\n".join([
             f"{plan['name']}: Elec Stand {plan['elec_standing']}p/d, Elec Unit {plan['elec_unit']}p/kWh, Gas Stand {plan['gas_standing']}p/d, Gas Unit {plan['gas_unit']}p/kWh"
             for plan in plans
@@ -591,11 +517,7 @@ class VisualizationUI(BaseUI):
         plt.close()
         print(f"\nComparison chart saved to: {outpath}")
         return True
-    
     def get_float_input(self, prompt, min_value=None, max_value=None):
-        """
-        Prompt the user for a float input, with optional min/max validation.
-        """
         while True:
             try:
                 value = input(prompt)
