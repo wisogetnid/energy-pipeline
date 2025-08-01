@@ -172,36 +172,55 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                         consumption = None
                         cost = None
                         
-
-                        consumption_fields = ['consumption_value', 'consumption', 'consumption_total', 'value']
-                        cost_fields = ['cost_value', 'cost', 'cost_total']
-                        
-                        for field in consumption_fields:
-                            if field in data and data[field] is not None:
-                                consumption = float(data[field])
-                                break
-                        
-                        for field in cost_fields:
-                            if field in data and data[field] is not None:
-                                cost = float(data[field])
-                                break
-                        
-
+                        # First check for resource-specific fields (electricity_consumption, gas_consumption, etc.)
                         resource_types = ['electricity', 'gas', 'water']
+                        resource_consumption_total = 0
+                        resource_cost_total = 0
+                        found_resource_data = False
+                        
                         for resource in resource_types:
                             consumption_key = f'{resource}_consumption'
                             cost_key = f'{resource}_cost'
                             
                             if consumption_key in data and data[consumption_key] is not None:
-                                if consumption is None:
-                                    consumption = 0
-                                consumption += float(data[consumption_key])
+                                resource_consumption_total += float(data[consumption_key])
+                                found_resource_data = True
                             
                             if cost_key in data and data[cost_key] is not None:
-                                if cost is None:
-                                    cost = 0
-                                cost += float(data[cost_key])
+                                resource_cost_total += float(data[cost_key])
+                                found_resource_data = True
                         
+                        # If we found resource-specific data, use that
+                        if found_resource_data:
+                            consumption = resource_consumption_total if resource_consumption_total > 0 else None
+                            cost = resource_cost_total if resource_cost_total > 0 else None
+                        else:
+                            # Otherwise, look for generic fields
+                            consumption_fields = ['consumption_value', 'consumption', 'consumption_total', 'value']
+                            cost_fields = ['cost_value', 'cost', 'cost_total']
+                            
+                            for field in consumption_fields:
+                                if field in data and data[field] is not None:
+                                    consumption = float(data[field])
+                                    break
+                            
+                            for field in cost_fields:
+                                if field in data and data[field] is not None:
+                                    cost = float(data[field])
+                                    break
+                        
+
+                        # Debug logging for July data
+                        if 'july' in str(date_str).lower() or (isinstance(date_str, str) and '2025-07' in date_str):
+                            logger.info(f"Processing July data: date={date_str}, consumption={consumption}, cost={cost}")
+                            logger.info(f"Raw data keys: {list(data.keys())}")
+                            for resource in resource_types:
+                                c_key = f'{resource}_consumption'
+                                cost_key = f'{resource}_cost'
+                                if c_key in data:
+                                    logger.info(f"  {c_key}: {data[c_key]}")
+                                if cost_key in data:
+                                    logger.info(f"  {cost_key}: {data[cost_key]}")
 
                         if consumption is None and cost is None:
                             continue

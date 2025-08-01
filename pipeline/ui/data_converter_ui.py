@@ -12,7 +12,7 @@ class DataConverterUI(BaseUI):
 
     def __init__(self):
         super().__init__()
-        self.data_dir = Path("data/glowmarkt_api_raw")
+        self.data_dir = Path("data/processed")
         self.output_dir = Path("data/processed")
 
     def combine_all_resources(self, directory=None):
@@ -137,7 +137,7 @@ class DataConverterUI(BaseUI):
 
     def get_directory(self):
         print("\nWhich directory would you like to process?")
-        print("1. Default directory (data/glowmarkt_api_raw)")
+        print("1. Default directory (data/processed)")
         print("2. Specify a different directory")
 
         choice = self.get_int_input("\nEnter your choice: ", 1, 2)

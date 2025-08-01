@@ -88,6 +88,7 @@ class VisualizationUI(BaseUI):
             return False
         print(f"Found {len(allFiles)} annual summary files.")
         for dataFile in allFiles:
+            print(f"Processing file: {dataFile.name}")
             year = dataFile.name.split("_")[0]
             if dataFile.suffix.lower() == '.jsonl':
                 months = []
@@ -115,6 +116,7 @@ class VisualizationUI(BaseUI):
                                         resource_costs[resource] = []
                                     resource_costs[resource].append(v)
                 if months:
+                    print(f"  Year {year}: Found months {months}")
                     yearlyData[year] = {
                         "months": months,
                         "consumption": consumptionTotals,
@@ -150,6 +152,7 @@ class VisualizationUI(BaseUI):
                             "resource_consumptions": resource_consumptions,
                             "resource_costs": resource_costs
                         }
+                        print(f"  Year {year} (parquet): Found months {months}")
                 except Exception as e:
                     print(f"Error processing parquet file {dataFile}: {str(e)}")
         if not yearlyData:
@@ -160,7 +163,6 @@ class VisualizationUI(BaseUI):
     def _create_overlay_charts(self, yearlyData):
         import numpy as np
         import matplotlib.pyplot as plt
-        monthNames = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
         resource_keys = set()
         for year, data in yearlyData.items():
             if 'resource_consumptions' in data:
@@ -176,7 +178,6 @@ class VisualizationUI(BaseUI):
         year_resource_cost_month = {}
         for year, data in yearlyData.items():
             months = data["months"]
-            month_to_idx = {m: i for i, m in enumerate(monthNames)}
             year_resource_month[year] = {}
             year_resource_cost_month[year] = {}
             for resource in resource_keys:
@@ -184,14 +185,20 @@ class VisualizationUI(BaseUI):
                 cost_values = [0] * 12
                 if 'resource_consumptions' in data and resource in data['resource_consumptions']:
                     for i, m in enumerate(months):
-                        idx = month_to_idx.get(m, None)
-                        if idx is not None and i < len(data['resource_consumptions'][resource]):
-                            values[idx] = data['resource_consumptions'][resource][i]
+                        try:
+                            month_idx = int(m) - 1
+                            if 0 <= month_idx < 12 and i < len(data['resource_consumptions'][resource]):
+                                values[month_idx] = data['resource_consumptions'][resource][i]
+                        except (ValueError, TypeError):
+                            continue
                 if 'resource_costs' in data and resource in data['resource_costs']:
                     for i, m in enumerate(months):
-                        idx = month_to_idx.get(m, None)
-                        if idx is not None and i < len(data['resource_costs'][resource]):
-                            cost_values[idx] = data['resource_costs'][resource][i]
+                        try:
+                            month_idx = int(m) - 1
+                            if 0 <= month_idx < 12 and i < len(data['resource_costs'][resource]):
+                                cost_values[month_idx] = data['resource_costs'][resource][i]
+                        except (ValueError, TypeError):
+                            continue
                 year_resource_month[year][resource] = values
                 year_resource_cost_month[year][resource] = cost_values
         print("\nTotal energy consumption per resource (last 12 months):")
@@ -202,11 +209,15 @@ class VisualizationUI(BaseUI):
                 for resource in resource_keys:
                     value = year_resource_month[year][resource][month_idx]
                     resource_months[resource].append(((int(year), month_idx+1), value))
+        print(f"Debug: Found {len(resource_months)} resources with monthly data")
         for resource in resource_keys:
             sorted_months = sorted(resource_months[resource], key=lambda x: (x[0][0], x[0][1]))
-            last12 = [v for (_, v) in sorted_months if v is not None][-12:]
+            print(f"Debug: {resource} has {len(sorted_months)} month entries")
+            print(f"Debug: Last few months for {resource}: {sorted_months[-6:]}")
+            last12_with_zero = [v for (_, v) in sorted_months][-12:]
+            last12 = [v for (_, v) in sorted_months if v is not None and v > 0][-12:]
             total = sum(last12)
-            print(f"  {resource}: {total:.2f}")
+            print(f"  {resource}: {total:.2f} (last 12 non-zero months out of {len(last12_with_zero)} total)")
         plt.figure(figsize=(14, 8))
         bar_width = 0.7 / max(1, len(year_resource_month))
         x = np.arange(12)
