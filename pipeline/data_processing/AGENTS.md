@@ -1,0 +1,31 @@
+# AGENTS.md for data_processing
+
+This document provides detailed information about the components in the `data_processing` directory.
+
+## Overview
+
+The `data_processing` directory contains modules for converting the raw energy consumption data into different formats. These formats are designed to be more efficient for storage and analysis.
+
+## Key Components
+
+### `jsonl_converter.py`
+
+-   **Purpose:** This module is responsible for converting the raw data into the JSONL (JSON Lines) format.
+-   **Functionality:** It takes the structured data object from the data retrieval step and writes it to a file, with each line in the file being a valid JSON object.
+-   **Usage:** This is useful for creating a simple, line-delimited log of the energy consumption data.
+
+### `parquet_converter.py`
+
+-   **Purpose:** This module converts the raw data into the Apache Parquet format.
+-   **Functionality:** Parquet is a columnar storage format that is optimized for use with big data processing frameworks. This module takes the structured data object and writes it to a Parquet file.
+-   **Usage:** This format is ideal for large-scale data analysis and can be used with tools like Apache Spark and Pandas.
+
+### `yearly_jsonl_converter.py`
+
+-   **Purpose:** This module is a specialized version of the JSONL converter that splits the data into separate files for each year.
+-   **Functionality:** It takes the structured data object and groups the data by year before writing it to a separate JSONL file for each year.
+-   **Usage:** This is useful for organizing the data into more manageable chunks and can make it easier to perform year-over-year analysis.
+
+## How to Add a New Data Format
+
+To add a new data format, you will need to create a new converter module in this directory. The new module should follow a similar structure to the existing converters and implement a consistent interface for converting the data.
