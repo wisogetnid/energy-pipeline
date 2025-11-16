@@ -188,19 +188,20 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                         
 
                         resource_types = ['electricity', 'gas', 'water']
-                        for resource in resource_types:
-                            consumption_key = f'{resource}_consumption'
-                            cost_key = f'{resource}_cost'
-                            
-                            if consumption_key in data and data[consumption_key] is not None:
-                                if consumption is None:
-                                    consumption = 0
-                                consumption += float(data[consumption_key])
-                            
-                            if cost_key in data and data[cost_key] is not None:
-                                if cost is None:
-                                    cost = 0
-                                cost += float(data[cost_key])
+                        if consumption is None and cost is None:
+                            for resource in resource_types:
+                                consumption_key = f'{resource}_consumption'
+                                cost_key = f'{resource}_cost'
+                                
+                                if consumption_key in data and data[consumption_key] is not None:
+                                    if consumption is None:
+                                        consumption = 0
+                                    consumption += float(data[consumption_key])
+                                
+                                if cost_key in data and data[cost_key] is not None:
+                                    if cost is None:
+                                        cost = 0
+                                    cost += float(data[cost_key])
                         
 
                         if consumption is None and cost is None:

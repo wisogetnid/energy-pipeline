@@ -277,3 +277,125 @@ class TestYearlyEnergyDataConverter:
             second_yearly_consumption = yearly_second['consumption_total']
         
         assert abs(second_yearly_consumption - expected_consumption) < 0.0001
+
+    def test_reprocessing_annual_summary_daily_records_preserves_values(self, tmp_path):
+        converter_output_dir = tmp_path / "output"
+        converter_output_dir.mkdir()
+        converter = YearlyEnergyDataConverter(output_dir=str(converter_output_dir))
+        
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        
+        annual_summary_with_daily_records = input_dir / "2024_annual_energy_summary.jsonl"
+        with open(annual_summary_with_daily_records, 'w') as f:
+            f.write(json.dumps({
+                'date': '2024-02-14',
+                'consumption_total': 193.98,
+                'cost_total': 1266.89,
+                'reading_count': 36,
+                'data_type': 'daily_summary',
+                'gas_consumption': 96.99,
+                'gas_consumption_unit': 'kWh',
+                'gas_cost': 633.44,
+                'gas_cost_unit': 'pence'
+            }) + '\n')
+            
+            f.write(json.dumps({
+                'date': '2024-02-15',
+                'consumption_total': 200.0,
+                'cost_total': 1300.0,
+                'reading_count': 36,
+                'data_type': 'daily_summary',
+                'gas_consumption': 100.0,
+                'gas_consumption_unit': 'kWh',
+                'gas_cost': 650.0,
+                'gas_cost_unit': 'pence'
+            }) + '\n')
+        
+        converter.convert_to_yearly_jsonl([str(annual_summary_with_daily_records)])
+        
+        output_2024 = converter_output_dir / "2024_annual_energy_summary.jsonl"
+        assert output_2024.exists()
+        
+        with open(output_2024, 'r') as f:
+            lines = f.readlines()
+            yearly_summary = json.loads(lines[0])
+            
+            expected_consumption = 193.98 + 200.0
+            expected_cost = 1266.89 + 1300.0
+            
+            actual_consumption = yearly_summary['consumption_total']
+            actual_cost = yearly_summary['cost_total']
+            
+            print(f"\nExpected: {expected_consumption}, Actual: {actual_consumption}, Diff: {actual_consumption - expected_consumption}")
+            
+            assert abs(actual_consumption - expected_consumption) < 0.01
+            assert abs(actual_cost - expected_cost) < 0.01
+
+    def test_monthly_jsonl_with_resource_fields_no_duplication(self, tmp_path):
+        """Test that re-converting annual summary files doesn't duplicate values.
+        Bug: daily_summary records have BOTH consumption_total AND resource fields, causing duplication."""
+        converter_output_dir = tmp_path / "output"
+        converter_output_dir.mkdir()
+        converter = YearlyEnergyDataConverter(output_dir=str(converter_output_dir))
+        
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        
+        # Simulate ACTUAL annual summary file structure with daily_summary records
+        # These have BOTH consumption_total (the sum) AND individual resource fields
+        annual_summary_jsonl = input_dir / "2024_annual_energy_summary.jsonl"
+        with open(annual_summary_jsonl, 'w') as f:
+            # Real daily summary records from actual annual files
+            f.write(json.dumps({
+                'date': '2024-02-14',
+                'consumption_total': 193.98,  # This is the sum
+                'cost_total': 1266.89,
+                'reading_count': 36,
+                'data_type': 'daily_summary',
+                'gas_consumption': 96.99,  # Individual resource (part of the sum above)
+                'gas_consumption_unit': 'kWh',
+                'gas_cost': 633.44,
+                'gas_cost_unit': 'pence'
+            }) + '\n')
+            
+            f.write(json.dumps({
+                'date': '2024-02-15',
+                'consumption_total': 200.0,
+                'cost_total': 1300.0,
+                'reading_count': 36,
+                'data_type': 'daily_summary',
+                'gas_consumption': 100.0,
+                'gas_consumption_unit': 'kWh',
+                'gas_cost': 650.0,
+                'gas_cost_unit': 'pence'
+            }) + '\n')
+        
+        # Re-convert - this triggers the bug!
+        converter.convert_to_yearly_jsonl([str(annual_summary_jsonl)])
+        
+        output_2024 = converter_output_dir / "2024_annual_energy_summary.jsonl"
+        assert output_2024.exists()
+        
+        with open(output_2024, 'r') as f:
+            lines = f.readlines()
+            yearly_summary = json.loads(lines[0])
+            
+            # Expected: 193.98 + 200.0 = 393.98
+            # BUG: (193.98 + 96.99) + (200.0 + 100.0) = 590.97 (adds consumption_total + resource fields)
+            expected_consumption = 193.98 + 200.0
+            expected_cost = 1266.89 + 1300.0
+            
+            actual_consumption = yearly_summary['consumption_total']
+            actual_cost = yearly_summary['cost_total']
+            
+            print(f"\n=== DUPLICATION TEST ===")
+            print(f"Expected consumption: {expected_consumption}")
+            print(f"Actual consumption: {actual_consumption}")
+            print(f"Difference: {actual_consumption - expected_consumption}")
+            
+            # This will FAIL with the bug (values doubled)
+            assert abs(actual_consumption - expected_consumption) < 0.01, \
+                f"BUG: Values doubled! Expected {expected_consumption}, got {actual_consumption}"
+            assert abs(actual_cost - expected_cost) < 0.01, \
+                f"BUG: Values doubled! Expected {expected_cost}, got {actual_cost}"
