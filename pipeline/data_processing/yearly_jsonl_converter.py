@@ -2,9 +2,9 @@ import json
 import logging
 import re
 from collections import defaultdict
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any, Tuple
+from datetime import datetime
 
 from pipeline.data_processing.jsonl_converter import EnergyDataConverter
 
@@ -87,44 +87,58 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
     def _extract_year_from_file(self, file_path: Path) -> str:
         filename = file_path.name.lower()
         
-
+        # Try to extract year from filename patterns
         year_pattern = r'(\d{4})\d{4}'
         match = re.search(year_pattern, filename)
         if match:
             return match.group(1)
             
-
+        # Try YYYY-MM pattern
         year_pattern2 = r'(\d{4})-\d{2}'
         match = re.search(year_pattern2, filename)
         if match:
             return match.group(1)
         
-
+        # For JSONL files, try to extract year from data
         if file_path.suffix.lower() == '.jsonl':
             try:
                 with open(file_path, 'r') as f:
                     first_line = f.readline().strip()
                     data = json.loads(first_line)
                     
-
+                    # Check for year field (output files have this)
+                    if 'year' in data and isinstance(data['year'], str):
+                        return data['year']
+                    
+                    # Check for date field
                     if 'date' in data and isinstance(data['date'], str):
                         return data['date'].split('-')[0]
                     
-
+                    # Check for from_date field
                     if 'from_date' in data and isinstance(data['from_date'], str):
                         return data['from_date'].split('-')[0]
                     
-
+                    # Check for timestamp_iso field
                     if 'timestamp_iso' in data and isinstance(data['timestamp_iso'], str):
                         return data['timestamp_iso'].split('-')[0]
+                    
+                    # Check for timestamp field and convert it
+                    if 'timestamp' in data:
+                        timestamp = data['timestamp']
+                        try:
+                            if isinstance(timestamp, (int, float)):
+                                timestamp_seconds = timestamp / 1000 if timestamp > 9999999999 else timestamp
+                                dt = datetime.fromtimestamp(timestamp_seconds)
+                                return dt.strftime('%Y')
+                        except:
+                            pass
             except:
                 pass
         
-
         return "unknown"
     
     def _process_jsonl_file(self, file_path: Path) -> Dict[str, Dict[str, Dict]]:
-        yearly_data = defaultdict(lambda: defaultdict(lambda: {'consumption_value': 0, 'cost_value': 0, 'count': 0, 'readings': []}))
+        yearly_data = defaultdict(lambda: defaultdict(dict))
         
         try:
             with open(file_path, 'r') as f:
@@ -132,12 +146,65 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                     try:
                         data = json.loads(line)
                         
-
+                        # Check if this is an output summary file
+                        if 'data_type' in data:
+                            if data['data_type'] == 'daily_summary':
+                                # Process daily summary data
+                                date_str = data['date']
+                                year = date_str.split('-')[0]
+                                
+                                # Initialize the day's data if not exists
+                                if date_str not in yearly_data[year]:
+                                    yearly_data[year][date_str] = {
+                                        'consumption_value': 0, 
+                                        'cost_value': 0, 
+                                        'count': 0, 
+                                        'readings': []
+                                    }
+                                
+                                # Extract consumption and cost values from summary
+                                consumption = data.get('consumption_total', 0)
+                                cost = data.get('cost_total', 0)
+                                
+                                yearly_data[year][date_str]['consumption_value'] += consumption
+                                yearly_data[year][date_str]['cost_value'] += cost
+                                yearly_data[year][date_str]['count'] += data.get('reading_count', 0)
+                                
+                                # Store resource-specific data
+                                resource_types = ['electricity', 'gas', 'water']
+                                for resource in resource_types:
+                                    consumption_key = f'{resource}_consumption'
+                                    cost_key = f'{resource}_cost'
+                                    
+                                    if f'{resource}_consumption' in data:
+                                        if consumption_key not in yearly_data[year][date_str]:
+                                            yearly_data[year][date_str][consumption_key] = 0
+                                        yearly_data[year][date_str][consumption_key] += data[f'{resource}_consumption']
+                                        
+                                        # Store resource metadata
+                                        if resource not in self.resource_metadata and f'{resource}_consumption_unit' in data:
+                                            self.resource_metadata[resource] = {
+                                                'consumption_unit': data[f'{resource}_consumption_unit'],
+                                                'cost_unit': data.get(f'{resource}_cost_unit', 'unknown')
+                                            }
+                                    
+                                    if f'{resource}_cost' in data:
+                                        if cost_key not in yearly_data[year][date_str]:
+                                            yearly_data[year][date_str][cost_key] = 0
+                                        yearly_data[year][date_str][cost_key] += data[f'{resource}_cost']
+                                
+                                continue
+                            elif data['data_type'] in ['yearly_summary', 'monthly_summary']:
+                                # Skip yearly and monthly summaries as they are aggregated data
+                                continue
+                        
+                        # Process raw data records (original logic)
+                        # Extract timestamp
                         timestamp = None
                         if 'timestamp' in data:
                             timestamp = data['timestamp']
                         elif 'date' in data:
-
+                            # Try to convert date to timestamp
                             try:
                                 date = datetime.fromisoformat(data['date'])
                                 timestamp = date.timestamp()
@@ -147,7 +214,7 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                         if timestamp is None:
                             continue
                         
-
+                        # Convert timestamp to date string and year
                         try:
                             if isinstance(timestamp, (int, float)):
                                 timestamp_seconds = timestamp / 1000 if timestamp > 9999999999 else timestamp
@@ -158,7 +225,7 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                             date_str = dt.strftime('%Y-%m-%d')
                             year = dt.strftime('%Y')
                         except:
-
+                            # Fallback to string parsing
                             if 'date' in data and isinstance(data['date'], str):
                                 date_str = data['date']
                                 year = date_str.split('-')[0]
@@ -168,11 +235,20 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                             else:
                                 continue
                         
-
+                        # Initialize the day's data if not exists
+                        if date_str not in yearly_data[year]:
+                            yearly_data[year][date_str] = {
+                                'consumption_value': 0, 
+                                'cost_value': 0, 
+                                'count': 0, 
+                                'readings': []
+                            }
+                        
+                        # Extract consumption and cost values
                         consumption = None
                         cost = None
                         
-
+                        # Try different field names for consumption
                         consumption_fields = ['consumption_value', 'consumption', 'consumption_total', 'value']
                         cost_fields = ['cost_value', 'cost', 'cost_total']
                         
@@ -186,7 +262,7 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                                 cost = float(data[field])
                                 break
                         
-
+                        # Check for resource-specific consumption and cost
                         resource_types = ['electricity', 'gas', 'water']
                         if consumption is None and cost is None:
                             for resource in resource_types:
@@ -203,11 +279,11 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                                         cost = 0
                                     cost += float(data[cost_key])
                         
-
+                        # Skip if no useful data
                         if consumption is None and cost is None:
                             continue
                         
-
+                        # Update the daily totals
                         if consumption is not None:
                             yearly_data[year][date_str]['consumption_value'] += consumption
                         if cost is not None:
@@ -251,20 +327,44 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
         return yearly_data
     
     def convert_to_yearly_jsonl(self, files: List[Union[Path, str, tuple]]) -> List[str]:
-        yearly_data_combined = defaultdict(lambda: defaultdict(lambda: {'consumption_value': 0, 'cost_value': 0, 'count': 0}))
-        self.resource_metadata = {}
+        
+        # First, separate input files from potential output files
+        input_files = []
+        potential_output_files = []
+        
         for file_item in files:
+            file_path = Path(file_item[0] if isinstance(file_item, tuple) else file_item)
+            
+            # Check if this looks like an output file (has the annual summary naming pattern)
+            if file_path.name.endswith('_annual_energy_summary.jsonl'):
+                potential_output_files.append(file_item)
+            else:
+                input_files.append(file_item)
+        
+        # Process all input files first
+        yearly_data_combined = defaultdict(lambda: defaultdict(dict))
+        self.resource_metadata = {}
+        
+        for file_item in input_files:
             if isinstance(file_item, tuple):
                 file_path = Path(file_item[0])
             else:
                 file_path = Path(file_item)
-            logger.info(f"Processing file: {file_path}")
+            logger.info(f"Processing input file: {file_path}")
             if file_path.suffix.lower() == '.jsonl':
                 file_yearly_data = self._process_jsonl_file(file_path)
                 for year, days in file_yearly_data.items():
                     for day, data in days.items():
+                        # Initialize the day's data if not exists
+                        if day not in yearly_data_combined[year]:
+                            yearly_data_combined[year][day] = {
+                                'consumption_value': 0, 
+                                'cost_value': 0, 
+                                'count': 0
+                            }
+                        
                         for k, v in data.items():
-                            if k in yearly_data_combined[year][day] and isinstance(v, (int, float)):
+                            if k in ['consumption_value', 'cost_value', 'count'] and isinstance(v, (int, float)):
                                 yearly_data_combined[year][day][k] += v
                             elif k not in yearly_data_combined[year][day]:
                                 yearly_data_combined[year][day][k] = v
@@ -278,22 +378,69 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                         self.resource_metadata[resource_type] = resource_metadata
                     for day, values in daily_data.items():
                         year = day.split('-')[0]
+                        if day not in yearly_data_combined[year]:
+                            yearly_data_combined[year][day] = {
+                                'consumption_value': 0, 
+                                'cost_value': 0, 
+                                'count': 0
+                            }
+                        
                         for k, v in values.items():
-                            if k in yearly_data_combined[year][day] and isinstance(v, (int, float)):
+                            if k in ['consumption_value', 'cost_value', 'count'] and isinstance(v, (int, float)):
                                 yearly_data_combined[year][day][k] += v
                             elif k not in yearly_data_combined[year][day]:
                                 yearly_data_combined[year][day][k] = v
+        
+        years_with_input_data = set(yearly_data_combined.keys())
+        
+        for file_item in potential_output_files:
+            if isinstance(file_item, tuple):
+                file_path = Path(file_item[0])
+            else:
+                file_path = Path(file_item)
+            
+            year = self._extract_year_from_file(file_path)
+            
+            if year not in years_with_input_data:
+                logger.info(f"Processing output file (no input data for {year}): {file_path}")
+                file_yearly_data = self._process_jsonl_file(file_path)
+                for year_key, days in file_yearly_data.items():
+                    for day, data in days.items():
+                        # Initialize the day's data if not exists
+                        if day not in yearly_data_combined[year_key]:
+                            yearly_data_combined[year_key][day] = {
+                                'consumption_value': 0, 
+                                'cost_value': 0, 
+                                'count': 0
+                            }
+                        
+                        for k, v in data.items():
+                            if k in ['consumption_value', 'cost_value', 'count'] and isinstance(v, (int, float)):
+                                yearly_data_combined[year_key][day][k] += v
+                            elif k not in yearly_data_combined[year_key][day]:
+                                yearly_data_combined[year_key][day][k] = v
+            else:
+                logger.info(f"Skipping output file (input data exists for {year}): {file_path}")
+        
+        for year in yearly_data_combined.keys():
+            output_file = self.output_dir / f"{year}_annual_energy_summary.jsonl"
+            if output_file.exists():
+                logger.info(f"Deleting existing annual summary file to prevent duplication: {output_file}")
+                output_file.unlink()
         output_files = []
         for year, daily_readings in yearly_data_combined.items():
             if not daily_readings:
                 continue
             output_file = self.output_dir / f"{year}_annual_energy_summary.jsonl"
             output_files.append(str(output_file))
-            monthly_data = defaultdict(lambda: {'consumption_value': 0, 'cost_value': 0, 'count': 0})
+            monthly_data = defaultdict(dict)
             for day, data in daily_readings.items():
                 month = day[:7]
+                if month not in monthly_data:
+                    monthly_data[month] = {'consumption_value': 0, 'cost_value': 0, 'count': 0}
+                
                 for k, v in data.items():
-                    if k in monthly_data[month] and isinstance(v, (int, float)):
+                    if k in ['consumption_value', 'cost_value', 'count'] and isinstance(v, (int, float)):
                         monthly_data[month][k] += v
                     elif k not in monthly_data[month]:
                         monthly_data[month][k] = v
@@ -301,8 +448,8 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                 # Yearly summary
                 summary = {
                     'year': year,
-                    'consumption_total': sum(d['consumption_value'] for d in daily_readings.values()),
-                    'cost_total': sum(d['cost_value'] for d in daily_readings.values()),
+                    'consumption_total': sum(d['consumption_value'] for d in daily_readings.values() if 'consumption_value' in d),
+                    'cost_total': sum(d['cost_value'] for d in daily_readings.values() if 'cost_value' in d),
                     'reading_count': sum(d['count'] for d in daily_readings.values()),
                     'days_with_readings': len(daily_readings),
                     'from_date': f"{year}-01-01",
@@ -322,8 +469,8 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                     month_summary = {
                         'year': year,
                         'month': month,
-                        'consumption_total': data['consumption_value'],
-                        'cost_total': data['cost_value'],
+                        'consumption_total': data.get('consumption_value', 0),
+                        'cost_total': data.get('cost_value', 0),
                         'reading_count': data['count'],
                         'data_type': 'monthly_summary'
                     }
@@ -339,8 +486,8 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                 for day, data in sorted(daily_readings.items()):
                     day_summary = {
                         'date': day,
-                        'consumption_total': data['consumption_value'],
-                        'cost_total': data['cost_value'],
+                        'consumption_total': data.get('consumption_value', 0),
+                        'cost_total': data.get('cost_value', 0),
                         'reading_count': data['count'],
                         'data_type': 'daily_summary'
                     }

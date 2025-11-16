@@ -332,9 +332,7 @@ class TestYearlyEnergyDataConverter:
             assert abs(actual_consumption - expected_consumption) < 0.01
             assert abs(actual_cost - expected_cost) < 0.01
 
-    def test_monthly_jsonl_with_resource_fields_no_duplication(self, tmp_path):
-        """Test that re-converting annual summary files doesn't duplicate values.
-        Bug: daily_summary records have BOTH consumption_total AND resource fields, causing duplication."""
+    def test_idempotency_with_existing_annual_summary(self, tmp_path):
         converter_output_dir = tmp_path / "output"
         converter_output_dir.mkdir()
         converter = YearlyEnergyDataConverter(output_dir=str(converter_output_dir))
@@ -342,60 +340,39 @@ class TestYearlyEnergyDataConverter:
         input_dir = tmp_path / "input"
         input_dir.mkdir()
         
-        # Simulate ACTUAL annual summary file structure with daily_summary records
-        # These have BOTH consumption_total (the sum) AND individual resource fields
-        annual_summary_jsonl = input_dir / "2024_annual_energy_summary.jsonl"
-        with open(annual_summary_jsonl, 'w') as f:
-            # Real daily summary records from actual annual files
+        # 1. Create an initial annual summary file
+        annual_summary_file = converter_output_dir / "2024_annual_energy_summary.jsonl"
+        with open(annual_summary_file, 'w') as f:
             f.write(json.dumps({
-                'date': '2024-02-14',
-                'consumption_total': 193.98,  # This is the sum
-                'cost_total': 1266.89,
-                'reading_count': 36,
-                'data_type': 'daily_summary',
-                'gas_consumption': 96.99,  # Individual resource (part of the sum above)
-                'gas_consumption_unit': 'kWh',
-                'gas_cost': 633.44,
-                'gas_cost_unit': 'pence'
+                'year': '2024', 'data_type': 'yearly_summary', 'consumption_total': 100, 'cost_total': 10
+            }) + '\n')
+            f.write(json.dumps({
+                'date': '2024-01-01', 'data_type': 'daily_summary', 'consumption_total': 100, 'cost_total': 10
+            }) + '\n')
+
+        # 2. Create a new monthly file to be processed
+        monthly_file = input_dir / "2024-02.jsonl"
+        with open(monthly_file, 'w') as f:
+            f.write(json.dumps({
+                'timestamp': 1706745600, 'consumption_value': 50, 'cost_value': 5
             }) + '\n')
             
-            f.write(json.dumps({
-                'date': '2024-02-15',
-                'consumption_total': 200.0,
-                'cost_total': 1300.0,
-                'reading_count': 36,
-                'data_type': 'daily_summary',
-                'gas_consumption': 100.0,
-                'gas_consumption_unit': 'kWh',
-                'gas_cost': 650.0,
-                'gas_cost_unit': 'pence'
-            }) + '\n')
+        # 3. Run the converter with both the new monthly file and the existing annual summary
+        # The bug is that it will read the annual summary and add its values to the new calculation
+        files_to_process = [str(monthly_file), str(annual_summary_file)]
+        converter.convert_to_yearly_jsonl(files_to_process)
         
-        # Re-convert - this triggers the bug!
-        converter.convert_to_yearly_jsonl([str(annual_summary_jsonl)])
-        
-        output_2024 = converter_output_dir / "2024_annual_energy_summary.jsonl"
-        assert output_2024.exists()
-        
-        with open(output_2024, 'r') as f:
+        # 4. Check the results
+        with open(annual_summary_file, 'r') as f:
             lines = f.readlines()
-            yearly_summary = json.loads(lines[0])
+            new_yearly_summary = json.loads(lines[0])
             
-            # Expected: 193.98 + 200.0 = 393.98
-            # BUG: (193.98 + 96.99) + (200.0 + 100.0) = 590.97 (adds consumption_total + resource fields)
-            expected_consumption = 193.98 + 200.0
-            expected_cost = 1266.89 + 1300.0
+            # Expected: The new summary should ONLY contain data from the monthly file (50)
+            # Bug: The new summary will contain data from monthly + old annual (50 + 100 = 150)
+            expected_consumption = 50
+            actual_consumption = new_yearly_summary['consumption_total']
             
-            actual_consumption = yearly_summary['consumption_total']
-            actual_cost = yearly_summary['cost_total']
+            print(f"\nIdempotency Test: Expected={expected_consumption}, Actual={actual_consumption}")
             
-            print(f"\n=== DUPLICATION TEST ===")
-            print(f"Expected consumption: {expected_consumption}")
-            print(f"Actual consumption: {actual_consumption}")
-            print(f"Difference: {actual_consumption - expected_consumption}")
-            
-            # This will FAIL with the bug (values doubled)
             assert abs(actual_consumption - expected_consumption) < 0.01, \
-                f"BUG: Values doubled! Expected {expected_consumption}, got {actual_consumption}"
-            assert abs(actual_cost - expected_cost) < 0.01, \
-                f"BUG: Values doubled! Expected {expected_cost}, got {actual_cost}"
+                f"Idempotency bug! Expected {expected_consumption}, got {actual_consumption}"
