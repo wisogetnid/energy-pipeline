@@ -132,3 +132,148 @@ class TestYearlyEnergyDataConverter:
             assert feb01 is not None
             assert abs(feb01['consumption_total'] - 0.039) < 0.0001
             assert abs(feb01['cost_total'] - 0.5123) < 0.0001
+
+    def test_convert_to_yearly_jsonl_multiple_times_does_not_duplicate(self, converter, electricity_consumption_file_path, electricity_cost_file_path):
+        file_pairs = [(str(electricity_consumption_file_path), str(electricity_cost_file_path))]
+
+        output_files_first = converter.convert_to_yearly_jsonl(file_pairs)
+        
+        output_2025 = Path(converter.output_dir) / "2025_annual_energy_summary.jsonl"
+        
+        with open(output_2025, 'r') as f:
+            lines_first = f.readlines()
+            daily_records_first = [json.loads(line) for line in lines_first if json.loads(line).get('data_type') == 'daily_summary']
+            feb01_first = next((record for record in daily_records_first if record.get('date') == '2025-02-01'), None)
+            first_consumption = feb01_first['consumption_total']
+            first_cost = feb01_first['cost_total']
+        
+        output_files_second = converter.convert_to_yearly_jsonl(file_pairs)
+        
+        with open(output_2025, 'r') as f:
+            lines_second = f.readlines()
+            daily_records_second = [json.loads(line) for line in lines_second if json.loads(line).get('data_type') == 'daily_summary']
+            feb01_second = next((record for record in daily_records_second if record.get('date') == '2025-02-01'), None)
+            second_consumption = feb01_second['consumption_total']
+            second_cost = feb01_second['cost_total']
+        
+        assert abs(first_consumption - second_consumption) < 0.0001
+        assert abs(first_cost - second_cost) < 0.0001
+        assert abs(second_consumption - 0.047) < 0.0001
+        assert abs(second_cost - 0.78773) < 0.0001
+
+    def test_convert_with_existing_file_does_not_duplicate(self, converter, tmp_path):
+        existing_consumption_data = {
+            "resource_id": "test-id-1",
+            "resource_name": "electricity consumption",
+            "readings": [
+                [1738368000, 0.047],
+                [1738454400, 0.059],
+            ]
+        }
+        existing_cost_data = {
+            "resource_id": "test-id-2",
+            "resource_name": "electricity cost",
+            "readings": [
+                [1738368000, 0.78773],
+                [1738454400, 0.44709],
+            ]
+        }
+        
+        consumption_file = tmp_path / "electricity_consumption.json"
+        cost_file = tmp_path / "electricity_cost.json"
+        
+        with open(consumption_file, 'w') as f:
+            json.dump(existing_consumption_data, f)
+        with open(cost_file, 'w') as f:
+            json.dump(existing_cost_data, f)
+        
+        file_pairs = [(str(consumption_file), str(cost_file))]
+        converter.convert_to_yearly_jsonl(file_pairs)
+        
+        output_2025 = Path(converter.output_dir) / "2025_annual_energy_summary.jsonl"
+        
+        with open(output_2025, 'r') as f:
+            lines_first = f.readlines()
+            yearly_first = json.loads(lines_first[0])
+            first_yearly_consumption = yearly_first['consumption_total']
+        
+        converter.convert_to_yearly_jsonl(file_pairs)
+        
+        with open(output_2025, 'r') as f:
+            lines_second = f.readlines()
+            yearly_second = json.loads(lines_second[0])
+            second_yearly_consumption = yearly_second['consumption_total']
+        
+        assert abs(first_yearly_consumption - second_yearly_consumption) < 0.0001
+        
+        new_consumption_data = {
+            "resource_id": "test-id-1",
+            "resource_name": "electricity consumption",
+            "readings": [
+                [1738368000, 0.047],
+                [1738454400, 0.059],
+                [1738540800, 0.065],
+            ]
+        }
+        new_cost_data = {
+            "resource_id": "test-id-2",
+            "resource_name": "electricity cost",
+            "readings": [
+                [1738368000, 0.78773],
+                [1738454400, 0.44709],
+                [1738540800, 0.55555],
+            ]
+        }
+        
+        with open(consumption_file, 'w') as f:
+            json.dump(new_consumption_data, f)
+        with open(cost_file, 'w') as f:
+            json.dump(new_cost_data, f)
+        
+        converter.convert_to_yearly_jsonl(file_pairs)
+        
+        with open(output_2025, 'r') as f:
+            lines_third = f.readlines()
+            yearly_third = json.loads(lines_third[0])
+            third_yearly_consumption = yearly_third['consumption_total']
+            daily_records_third = [json.loads(line) for line in lines_third if json.loads(line).get('data_type') == 'daily_summary']
+        
+        expected_total = 0.047 + 0.059 + 0.065
+        assert abs(third_yearly_consumption - expected_total) < 0.0001
+        assert len(daily_records_third) == 3
+
+    def test_convert_existing_jsonl_file_does_not_duplicate(self, tmp_path):
+        converter_output_dir = tmp_path / "output"
+        converter_output_dir.mkdir()
+        converter = YearlyEnergyDataConverter(output_dir=str(converter_output_dir))
+        
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        
+        initial_jsonl = input_dir / "2025_data.jsonl"
+        with open(initial_jsonl, 'w') as f:
+            f.write(json.dumps({"timestamp": 1738368000, "consumption_value": 0.047, "cost_value": 0.78773}) + '\n')
+            f.write(json.dumps({"timestamp": 1738454400, "consumption_value": 0.059, "cost_value": 0.44709}) + '\n')
+        
+        converter.convert_to_yearly_jsonl([str(initial_jsonl)])
+        
+        output_2025 = converter_output_dir / "2025_annual_energy_summary.jsonl"
+        
+        with open(output_2025, 'r') as f:
+            lines_first = f.readlines()
+            yearly_first = json.loads(lines_first[0])
+            first_yearly_consumption = yearly_first['consumption_total']
+            first_yearly_cost = yearly_first['consumption_total']
+        
+        expected_consumption = 0.047 + 0.059
+        expected_cost = 0.78773 + 0.44709
+        assert abs(first_yearly_consumption - expected_consumption) < 0.0001
+        
+        converter.convert_to_yearly_jsonl([str(output_2025)])
+        
+        with open(output_2025, 'r') as f:
+            lines_second = f.readlines()
+            yearly_second = json.loads(lines_second[0])
+            second_yearly_consumption = yearly_second['consumption_total']
+        
+        assert abs(second_yearly_consumption - expected_consumption) < 0.0001
