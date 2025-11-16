@@ -4,7 +4,7 @@ This document provides instructions and guidelines for AI agents working on this
 
 ## Project Overview
 
-This project is a Python-based data pipeline for retrieving, processing, and visualizing energy data. It is designed to be modular and extensible, allowing for the addition of new data sources, processing steps, and visualizations.
+This project is a Python-based data pipeline for retrieving, processing, and visualizing energy data from the Hildebrand Glowmarkt API. It allows users to fetch their energy consumption data, convert it into different formats (JSONL, Parquet), and generate visualizations to analyze energy usage patterns. The pipeline is designed to be modular and extensible, allowing for the addition of new data sources, processing steps, and visualizations.
 
 ## High-Level Architecture
 
@@ -21,7 +21,65 @@ For a visual representation of the architecture, please refer to the diagram in 
 
 ## Getting Started
 
-To get started with the project, please refer to the instructions in `copilot-instructions.md`. This file provides a comprehensive guide on how to set up the environment, install dependencies, and run the application.
+### Environment Setup
+
+1.  **Python Version:** The project uses Python 3.8 or higher. It is recommended to use a version manager like `asdf` to manage Python versions. The `.tool-versions` file specifies the exact Python version.
+2.  **Virtual Environment:** Use a virtual environment to manage project dependencies. Create a new environment by running:
+    ```bash
+    ./go.sh create-env
+    ```
+    Activate the environment with:
+    ```bash
+    source .venv/bin/activate
+    ```
+3.  **Install Dependencies:** Install the required dependencies from `pyproject.toml`:
+    ```bash
+    ./go.sh install
+    ```
+
+### Running the Application
+
+The main application can be run using the following command:
+
+```bash
+./go.sh run
+```
+
+This will launch an interactive command-line interface (CLI) that allows you to choose from various options, such as retrieving data, converting data formats, and visualizing data.
+
+## Available Commands
+
+The `go.sh` script in the root directory provides a convenient way to run common tasks. Run go without arguments to see a list of available commands:
+
+-   `./go.sh install` - Install required dependencies
+-   `./go.sh run` - Run the complete energy pipeline
+-   `./go.sh test` - Run all unit tests
+-   `./go.sh test-coverage` - Run tests with coverage report
+-   `./go.sh clean` - Clean up generated files
+-   `./go.sh create-env` - Create a new virtual environment
+-   `./go.sh lint` - Lint code with pylint
+-   `./go.sh format` - Format code with black
+-   `./go.sh check` - Run tests and lint code
+
+You might need to execute `chmod +x go.sh` to make the `go.sh` script executable.
+
+## Code Style and Conventions
+
+-   **Formatting:** The project uses `black` for code formatting. Please run `./go.sh format` before committing any changes.
+-   **Linting:** `pylint` is used for linting. Run `./go.sh lint` to check for any linting errors.
+-   **Dependencies:** Project dependencies are managed in `pyproject.toml`.
+-   **Testing:** The project uses `pytest` for unit testing. Tests are located in the `tests` directory. Run `./go.sh test` to execute all tests.
+-   **Code Conventions:** Follow PEP 8 guidelines for Python code. Use meaningful variable and function names instead of comments or docstrings.
+
+## Key Components
+
+-   `pipeline/data_retrieval`: Contains modules for fetching data from the Glowmarkt API.
+-   `pipeline/data_processing`: Includes scripts for converting data into different formats (e.g., JSONL, Parquet).
+-   `pipeline/data_visualisation`: Contains modules for generating charts and visualizations of the energy data.
+-   `pipeline/ui`: Provides the command-line interface for interacting with the pipeline.
+-   `pipeline/tests`: Contains all the unit tests for the project.
+-   `go.sh`: Defines the commands for managing the project.
+-   `pyproject.toml`: Specifies the project metadata and dependencies.
 
 ## How to Contribute
 
