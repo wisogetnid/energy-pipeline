@@ -23,12 +23,13 @@ case "$1" in
   "install")
     echo "Installing dependencies with uv..."
     uv sync --dev
+    uv add --dev pytest pytest-cov --quiet 2>/dev/null || true
     ;;
   "run")
     uv run python -m pipeline
     ;;
   "test")
-    uv run --dev pytest pipeline/tests
+    uv run pytest pipeline/tests
     ;;
   "test-coverage")
     uv run pytest --cov=pipeline pipeline/tests --cov-report=term
