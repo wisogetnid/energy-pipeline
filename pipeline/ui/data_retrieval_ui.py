@@ -546,16 +546,14 @@ class DataRetrievalUI(BaseUI):
                         self.date_range = f"{month_start.date()} to {month_end.date()}"
                         
                         print(f"\nFetching month: {self.date_range}")
-                        # Always overwrite for latest fetch
-                        readings = self.retrieve_data(skip_if_exists=False)
+                        # Respect skip_if_exists to avoid redundant downloads
+                        readings = self.retrieve_data(skip_if_exists=True)
                         if readings:
                             filepath = self.save_data(readings)
                             if filepath:
                                 downloaded_filepaths.append(filepath)
                         else:
-                            print(f"Failed to retrieve data for {self.selected_resource_name} in range {self.date_range}")
-                            # Stop immediately on failure as per plan
-                            raise RuntimeError(f"Fetch failed for {self.selected_resource_name} at {self.date_range}")
+                            print(f"No data retrieved for {self.selected_resource_name} in range {self.date_range}")
                 else:
                     # Regular single-range fetch
                     readings = self.retrieve_data()
@@ -575,9 +573,6 @@ class DataRetrievalUI(BaseUI):
             except Exception as e:
                 failed_resources.append(self.selected_resource_name or f"Resource {i}")
                 print(f"Error processing resource: {str(e)}")
-                if self.is_latest_fetch:
-                    # Stop processing other resources if latest fetch failed
-                    break
         
         # Restore original dates
         self.start_date = original_start

@@ -52,13 +52,5 @@ def get_latest_available_date(data_dir: str, resource_names: List[str], default_
     # Cross-Resource Sync: Use the earliest of these "latest dates"
     global_sync_date = min(resource_latest_dates.values())
     
-    # Identify which resource(s) gave us this global_sync_date and use their pivot_start
-    # Actually, if we have multiple resources, they might have different start dates for the same month 
-    # (though unlikely if they are all monthly). 
-    # To be safe, we find the pivot_start corresponding to the resource that is "most behind".
-    
-    for resource, latest_end in resource_latest_dates.items():
-        if latest_end == global_sync_date:
-            return resource_pivot_starts[resource]
-
-    return default_date
+    # Return the global sync date. The retrieval logic will start from here.
+    return global_sync_date
