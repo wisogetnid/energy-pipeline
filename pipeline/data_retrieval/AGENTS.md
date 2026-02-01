@@ -32,6 +32,10 @@ The `data_retrieval` directory contains modules responsible for fetching energy 
 -   **Functionality:** Scans raw data directories to find the most recent file for each resource and determines a safe starting point ("pivot") for fetching new data.
 -   **Usage:** Used by the UI to implement the "Get latest data" feature.
 
+## GLOBAL DIRECTIVES (CRITICAL)
+
+Adhere to the **Global Directives** (including the **No Comments Policy**) defined in the root [AGENTS.md](../../AGENTS.md).
+
 ## How to Add a New Data Source
 
 To add a new data source, you will need to create a new client in this directory. The new client should follow a similar structure to the existing clients and implement a consistent interface for fetching data.

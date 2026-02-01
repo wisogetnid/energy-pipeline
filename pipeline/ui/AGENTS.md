@@ -40,3 +40,7 @@ The `ui` directory contains the modules that make up the command-line interface 
 ## How to Add a New UI Component
 
 To add a new UI component, you will need to create a new module in this directory. The new module should contain a class that inherits from one of the base UI classes and implements the necessary functionality for the new component.
+
+## GLOBAL DIRECTIVES (CRITICAL)
+
+Adhere to the **Global Directives** (including the **No Comments Policy**) defined in the root [AGENTS.md](../../AGENTS.md).

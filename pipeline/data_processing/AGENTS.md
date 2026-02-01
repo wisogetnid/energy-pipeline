@@ -32,3 +32,7 @@ The `data_processing` directory contains modules for converting the raw energy c
 ## How to Add a New Data Format
 
 To add a new data format, you will need to create a new converter module in this directory. The new module should follow a similar structure to the existing converters and implement a consistent interface for converting the data.
+
+## GLOBAL DIRECTIVES (CRITICAL)
+
+Adhere to the **Global Directives** (including the **No Comments Policy**) defined in the root [AGENTS.md](../../AGENTS.md).

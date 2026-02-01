@@ -2,8 +2,12 @@
 
 This document provides instructions and guidelines for AI agents working on this codebase.
 
-## CRITICAL: Agent Command Constraints
+## GLOBAL DIRECTIVES (CRITICAL)
 
+### No Comments Policy
+Use **highly expressive and descriptive** variable and function names. Comments and docstrings **MUST be avoided entirely** in favor of self-documenting code. If you feel the need to add a comment, refactor the code to be more readable instead. This is a strict, non-negotiable directive.
+
+### Command Constraints
 **AI Agents MUST ALWAYS use the `./go.sh` script for all interactions with the application, environment, and development tools.**
 
 -   **Testing:** Use `./go.sh test` instead of `pytest`.
@@ -86,7 +90,7 @@ You might need to execute `chmod +x go.sh` to make the `go.sh` script executable
 -   **Linting:** `pylint` is used for linting. Run `./go.sh lint` to check for any linting errors.
 -   **Dependencies:** Project dependencies are managed in `pyproject.toml`.
 -   **Testing:** The project uses `pytest` for unit testing. Tests are located in the `tests` directory. Run `./go.sh test` to execute all tests.
--   **Code Conventions:** Follow PEP 8 guidelines for Python code. Use meaningful variable and function names instead of comments or docstrings.
+-   **Code Conventions:** Follow PEP 8 guidelines for Python code.
 
 ## Key Components
 

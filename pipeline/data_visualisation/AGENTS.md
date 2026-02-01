@@ -23,3 +23,7 @@ The `data_visualisation` directory contains modules for generating charts and ot
 ## How to Add a New Visualisation
 
 To add a new visualization, you will need to create a new module in this directory. The new module should contain a function that takes the processed data as input and generates a chart or other visualization.
+
+## GLOBAL DIRECTIVES (CRITICAL)
+
+Adhere to the **Global Directives** (including the **No Comments Policy**) defined in the root [AGENTS.md](../../AGENTS.md).

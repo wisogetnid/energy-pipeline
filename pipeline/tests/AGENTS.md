@@ -28,3 +28,7 @@ To run all the tests, you can use the following command:
 ## How to Add New Tests
 
 To add a new test, you will need to create a new test file in the appropriate subdirectory. The new test file should follow the `pytest` conventions and should include tests for all the new functionality.
+
+## GLOBAL DIRECTIVES (CRITICAL)
+
+Adhere to the **Global Directives** (including the **No Comments Policy**) defined in the root [AGENTS.md](../../AGENTS.md).
