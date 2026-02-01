@@ -4,7 +4,13 @@ This document provides instructions and guidelines for AI agents working on this
 
 ## Project Overview
 
-This project is a Python-based data pipeline for retrieving, processing, and visualizing energy data from the Hildebrand Glowmarkt API. It allows users to fetch their energy consumption data, convert it into different formats (JSONL, Parquet), and generate visualizations to analyze energy usage patterns. The pipeline is designed to be modular and extensible, allowing for the addition of new data sources, processing steps, and visualizations.
+This project is a Python-based data pipeline for retrieving, processing, and visualizing energy data from different data sources. It allows users to fetch their energy consumption data, convert it into different formats (JSONL, Parquet), and generate visualizations to analyze energy usage patterns. The pipeline is designed to be modular and extensible, allowing for the addition of new data sources, processing steps, and visualizations.
+
+### Supported data sources
+
+Currently supported data sources are
+- Hildebrand Glowmarkt API
+- n3rgy (personal) data in .json format
 
 ## High-Level Architecture
 
