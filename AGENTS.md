@@ -2,6 +2,17 @@
 
 This document provides instructions and guidelines for AI agents working on this codebase.
 
+## CRITICAL: Agent Command Constraints
+
+**AI Agents MUST ALWAYS use the `./go.sh` script for all interactions with the application, environment, and development tools.**
+
+-   **Testing:** Use `./go.sh test` instead of `pytest`.
+-   **Execution:** Use `./go.sh run` instead of `python -m pipeline`.
+-   **Linting/Formatting:** Use `./go.sh lint` or `./go.sh format` instead of calling `pylint` or `black` directly.
+-   **Setup:** Use `./go.sh install` or `./go.sh create-env` for environment management.
+
+Directly executing the underlying tools is prohibited as the `go.sh` script ensures correct environment variables, paths, and configurations are applied.
+
 ## Project Overview
 
 This project is a Python-based data pipeline for retrieving, processing, and visualizing energy data from different data sources. It allows users to fetch their energy consumption data, convert it into different formats (JSONL, Parquet), and generate visualizations to analyze energy usage patterns. The pipeline is designed to be modular and extensible, allowing for the addition of new data sources, processing steps, and visualizations.
@@ -10,7 +21,8 @@ This project is a Python-based data pipeline for retrieving, processing, and vis
 
 Currently supported data sources are
 - Hildebrand Glowmarkt API
-- n3rgy (personal) data in .json format
+- n3rgy consumer API
+- n3rgy (personal) data in .csv/.json format
 
 ## High-Level Architecture
 
