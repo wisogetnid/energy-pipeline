@@ -4,7 +4,7 @@
 
 The goal is to improve the data retrieval process by adding an automated "Get latest data" option. This feature will automatically detect the last date of available local data and fetch only the missing records from the selected provider.
 
-1.  **Selection:** Add a "Get latest data" option to the Time Range Selection in the CLI.
+1.  **Selection:** The "Get latest data" option becomes the **default and only** mode for data retrieval. Legacy manual date selection options are removed.
 2.  **Detection:** Identify the latest date for which raw data exists in the `/data` folder for the chosen provider (e.g., `data/glowmarkt_api_raw`).
 3.  **Retrieval:** Fetch all data from the day after the last local record up to the current date.
 4.  **Storage:** Save the new data in monthly files following the existing naming convention.
@@ -13,9 +13,10 @@ The goal is to improve the data retrieval process by adding an automated "Get la
 
 ## Implementation Details
 
-### 1. UI Changes
-- **Extend Time Range Selection:** In the CLI (likely in `data_retrieval_ui.py`), add "Get latest data" as a new menu option.
-- **Trigger Logic:** Upon selection, invoke the date detection service before proceeding to data fetching.
+### 1. UI Changes & Simplification
+- **Remove Legacy Options:** In the CLI (`data_retrieval_ui.py`), remove "Select month and year" and "Custom range (enter specific dates)" from the `select_time_range()` menu.
+- **Automatic Trigger:** Modify `select_time_range()` to skip user selection and automatically proceed with the "Get latest data" detection logic.
+- **Preset Cleanup:** Remove support for `select_month` and `custom` presets in the UI logic.
 
 ### 2. Determine Last Available Date
 - **Provider-Specific Folders:**
@@ -55,7 +56,7 @@ The goal is to improve the data retrieval process by adding an automated "Get la
 | File Path | Description of Changes |
 | :--- | :--- |
 | `pipeline/data_retrieval/latest_date_service.py` | **(New File)** Implement `get_latest_available_date(data_dir, resources)` to scan raw data folders, parse filenames, and determine the earliest "start-date pivot" across all selected resources. |
-| `pipeline/ui/data_retrieval_ui.py` | Update `select_time_range()` to add "Get latest data" option. Modify `_download_all_resources()` to support fetching data in monthly chunks when the "latest" flag is set. |
+| `pipeline/ui/data_retrieval_ui.py` | **Simplify `select_time_range()`**: Remove manual selection menu and legacy logic for `choice == 1` and `choice == 2`. Automatically invoke "latest data" logic. Update `_download_all_resources()` to support fetching data in monthly chunks. |
 | `pipeline/data_retrieval/batch_retrieval.py` | Enhance or add a wrapper to `get_readings_in_batches` to support grouping results by month to facilitate monthly file saving. |
 | `pipeline/tests/data_retrieval/test_latest_date_service.py` | **(New File)** Unit tests for the date parsing and cross-resource synchronization logic. |
 
