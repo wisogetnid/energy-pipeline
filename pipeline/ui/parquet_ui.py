@@ -5,10 +5,9 @@ from pipeline.ui.base_ui import BaseUI
 from pipeline.data_processing.parquet_converter import JsonlToParquetConverter
 
 class ParquetUI(BaseUI):
-    
     def __init__(self):
         super().__init__()
-        self.converter = JsonlToParquetConverter(output_dir="data/parquet")
+        self.parquet_converter = JsonlToParquetConverter(output_dir="data/parquet")
     
     def run(self):
         self.print_header("Convert to Parquet")
@@ -16,47 +15,50 @@ class ParquetUI(BaseUI):
         print("\nThis utility converts JSONL files to Parquet format.")
         print("Parquet files are more efficient for data analysis and visualization.")
         
-
-        processed_dir = Path("data/processed")
-        jsonl_files = list(processed_dir.glob("*.jsonl"))
+        source_processed_directory = Path("data/processed")
+        available_jsonl_files_list = list(source_processed_directory.glob("*.jsonl"))
         
-        if not jsonl_files:
+        if not available_jsonl_files_list:
             print("\nNo JSONL files found in data/processed directory.")
             return False
         
         print("\nAvailable JSONL files:")
-        for i, file_path in enumerate(jsonl_files, 1):
-            print(f"{i}. {file_path.name}")
+        for index, jsonl_file_path in enumerate(available_jsonl_files_list, 1):
+            print(f"{index}. {jsonl_file_path.name}")
         
-        print(f"{len(jsonl_files) + 1}. All files")
-        print(f"{len(jsonl_files) + 2}. Back")
+        total_files_count = len(available_jsonl_files_list)
+        all_files_option_index = total_files_count + 1
+        back_option_index = total_files_count + 2
         
-        choice = self.get_int_input("\nSelect a file to convert (or 'all'): ", 1, len(jsonl_files) + 2)
+        print(f"{all_files_option_index}. All files")
+        print(f"{back_option_index}. Back")
         
-        if choice == len(jsonl_files) + 2:
+        user_selection_index = self.get_int_input("\nSelect a file to convert (or 'all'): ", 1, back_option_index)
+        
+        if user_selection_index == back_option_index:
             return False
         
-        if choice == len(jsonl_files) + 1:
+        if user_selection_index == all_files_option_index:
             print("\nConverting all JSONL files to Parquet...")
-            converted_files = self.converter.convert_multiple_jsonl_files([str(f) for f in jsonl_files])
+            converted_parquet_files_paths = self.parquet_converter.convert_multiple_jsonl_files([str(jsonl_file) for jsonl_file in available_jsonl_files_list])
             
-            if converted_files:
-                print(f"\nSuccessfully converted {len(converted_files)} files to Parquet format:")
-                for file_path in converted_files:
-                    print(f"- {file_path}")
-                return converted_files
+            if converted_parquet_files_paths:
+                print(f"\nSuccessfully converted {len(converted_parquet_files_paths)} files to Parquet format:")
+                for converted_file_path in converted_parquet_files_paths:
+                    print(f"- {converted_file_path}")
+                return converted_parquet_files_paths
             else:
                 print("\nNo files were successfully converted.")
                 return False
         else:
-            selected_file = jsonl_files[choice - 1]
-            print(f"\nConverting {selected_file.name} to Parquet...")
+            selected_jsonl_file_path = available_jsonl_files_list[user_selection_index - 1]
+            print(f"\nConverting {selected_jsonl_file_path.name} to Parquet...")
             
-            output_file = self.converter.convert_jsonl_to_parquet_file(str(selected_file))
+            resulting_parquet_file_path = self.parquet_converter.convert_jsonl_to_parquet_file(str(selected_jsonl_file_path))
             
-            if output_file:
-                print(f"\nSuccessfully converted to Parquet format: {output_file}")
-                return [output_file]
+            if resulting_parquet_file_path:
+                print(f"\nSuccessfully converted to Parquet format: {resulting_parquet_file_path}")
+                return [resulting_parquet_file_path]
             else:
                 print("\nFailed to convert file.")
                 return False
