@@ -1,5 +1,3 @@
-
-
 import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Union, Optional, Tuple
@@ -90,6 +88,39 @@ class BatchRetriever:
             batch_start = batch_end
         
         return date_ranges
+    
+    def get_monthly_date_ranges(
+        self, 
+        start_date: datetime, 
+        end_date: datetime
+    ) -> List[Tuple[datetime, datetime]]:
+        """
+        Splits a date range into monthly chunks.
+        Returns a list of (month_start, month_end) tuples.
+        """
+        ranges = []
+        current_start = start_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        while current_start <= end_date:
+            # Calculate next month's start
+            next_month = current_start.month + 1
+            next_year = current_start.year
+            if next_month > 12:
+                next_month = 1
+                next_year += 1
+            
+            month_end_boundary = datetime(next_year, next_month, 1) - timedelta(seconds=1)
+            
+            # Clip to actual range
+            actual_start = max(current_start, start_date)
+            actual_end = min(month_end_boundary, end_date)
+            
+            if actual_start <= actual_end:
+                ranges.append((actual_start, actual_end))
+                
+            current_start = datetime(next_year, next_month, 1)
+            
+        return ranges
 
 def get_historical_readings(
     client: GlowmarktClient,

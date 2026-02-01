@@ -9,6 +9,7 @@ import shutil
 from pipeline.ui.base_ui import BaseUI
 from pipeline.data_retrieval import GlowmarktClient, get_historical_readings
 from pipeline.data_retrieval.n3rgy_csv_client import N3rgyCSVClient
+from pipeline.data_retrieval.latest_date_service import get_latest_available_date
 
 class DataRetrievalUI(BaseUI):
     
@@ -29,6 +30,7 @@ class DataRetrievalUI(BaseUI):
         self.date_range = ""
         self.batch_days = 10
         self.retrieved_filepaths = []
+        self.is_latest_fetch = False
     
     def select_data_source(self):
         self.print_header("Data Source Selection")
@@ -219,7 +221,7 @@ class DataRetrievalUI(BaseUI):
             print(f"Automatically selected {len(resources)} resources.")
             return resources
         return []
-    def select_time_range(self, preset=None):
+    def select_time_range(self, preset=None, resources=None):
         self.print_header("Time Range Selection")
         
         now = datetime.now()
@@ -227,15 +229,17 @@ class DataRetrievalUI(BaseUI):
         current_month = now.month
         
         if preset:
-            choice = {"select_month": 1, "custom": 2}.get(preset, 1)
+            choice = {"select_month": 1, "custom": 2, "latest": 3}.get(preset, 1)
         else:
             print("Choose a date range:")
             print("1. Select month and year")
             print("2. Custom range (enter specific dates)")
+            print("3. Get latest data (automatic)")
             
-            choice = self.get_int_input("\nSelect a range: ", 1, 2)
+            choice = self.get_int_input("\nSelect a range: ", 1, 3)
         
         if choice == 1:
+            self.is_latest_fetch = False
             try:
                 print("\nSelect month:")
                 month_names = [
@@ -278,6 +282,7 @@ class DataRetrievalUI(BaseUI):
                 return False
         
         elif choice == 2:
+            self.is_latest_fetch = False
             try:
                 start_input = input("\nEnter start date (YYYY-MM-DD): ")
                 self.start_date = parser.parse(start_input)
@@ -292,6 +297,25 @@ class DataRetrievalUI(BaseUI):
                 self.date_range = f"custom range: {self.start_date.date()} to {self.end_date.date()}"
             except Exception as e:
                 print(f"Error parsing dates: {str(e)}")
+                return False
+        elif choice == 3:
+            try:
+                if not resources:
+                    print("Error: Resources must be selected before determining latest date.")
+                    return False
+                
+                print("Detecting latest available data...")
+                data_dir = self._get_data_directory()
+                resource_names = [r.get("name") for r in resources if r.get("name")]
+                
+                self.start_date = get_latest_available_date(data_dir, resource_names)
+                self.end_date = now
+                self.is_latest_fetch = True
+                
+                self.date_range = f"latest data: {self.start_date.date()} to {self.end_date.date()}"
+                print(f"Detected latest sync point. Starting from: {self.start_date.date()}")
+            except Exception as e:
+                print(f"Error determining latest date: {str(e)}")
                 return False
     
         print(f"\nSelected date range: {self.date_range}")
@@ -465,7 +489,7 @@ class DataRetrievalUI(BaseUI):
             return
         
         # Select time range for all resources
-        if not self.select_time_range():
+        if not self.select_time_range(resources=resources):
             return
         
         # Process and download each resource
@@ -484,6 +508,10 @@ class DataRetrievalUI(BaseUI):
         
         downloaded_filepaths = []
         failed_resources = []
+        
+        # Store original start/end dates if we're doing a multi-month fetch
+        original_start = self.start_date
+        original_end = self.end_date
         
         for i, resource in enumerate(resources, 1):
             try:
@@ -505,24 +533,53 @@ class DataRetrievalUI(BaseUI):
                 
                 print(f"Retrieving data for: {self.selected_resource_name}")
                 
-                # Retrieve and save the data
-                readings = self.retrieve_data()
-                if readings:
-                    self.display_readings(readings)
-                    filepath = self.save_data(readings)
-                    if filepath:
-                        downloaded_filepaths.append(filepath)
-                        print(f"Successfully downloaded data for {self.selected_resource_name}")
+                if self.is_latest_fetch:
+                    # Multi-month fetch split into monthly chunks
+                    month_ranges = list(self._get_month_ranges(original_start, original_end))
+                    print(f"Splitting fetch into {len(month_ranges)} monthly chunks...")
+                    
+                    for month_start, month_end in month_ranges:
+                        self.start_date = month_start
+                        self.end_date = month_end
+                        self.date_range = f"{month_start.date()} to {month_end.date()}"
+                        
+                        print(f"\nFetching month: {self.date_range}")
+                        # Always overwrite for latest fetch
+                        readings = self.retrieve_data(skip_if_exists=False)
+                        if readings:
+                            filepath = self.save_data(readings)
+                            if filepath:
+                                downloaded_filepaths.append(filepath)
+                        else:
+                            print(f"Failed to retrieve data for {self.selected_resource_name} in range {self.date_range}")
+                            # Stop immediately on failure as per plan
+                            raise RuntimeError(f"Fetch failed for {self.selected_resource_name} at {self.date_range}")
+                else:
+                    # Regular single-range fetch
+                    readings = self.retrieve_data()
+                    if readings:
+                        self.display_readings(readings)
+                        filepath = self.save_data(readings)
+                        if filepath:
+                            downloaded_filepaths.append(filepath)
+                            print(f"Successfully downloaded data for {self.selected_resource_name}")
+                        else:
+                            failed_resources.append(self.selected_resource_name)
+                            print(f"Failed to save data for {self.selected_resource_name}")
                     else:
                         failed_resources.append(self.selected_resource_name)
-                        print(f"Failed to save data for {self.selected_resource_name}")
-                else:
-                    failed_resources.append(self.selected_resource_name)
-                    print(f"Failed to retrieve data for {self.selected_resource_name}")
+                        print(f"Failed to retrieve data for {self.selected_resource_name}")
             
             except Exception as e:
                 failed_resources.append(self.selected_resource_name or f"Resource {i}")
                 print(f"Error processing resource: {str(e)}")
+                if self.is_latest_fetch:
+                    # Stop processing other resources if latest fetch failed
+                    break
+        
+        # Restore original dates
+        self.start_date = original_start
+        self.end_date = original_end
         
         if failed_resources:
             print("\nFailed to download these resources:")
@@ -639,50 +696,32 @@ class DataRetrievalUI(BaseUI):
         if not self.selected_entity:
             if not self.select_entity():
                 return False
+
+        if not isinstance(self.client, GlowmarktClient):
+            print("Error: Client is not a GlowmarktClient instance.")
+            return False
+            
+        ve_id = self.selected_entity.get("veId", None)
+        if not ve_id:
+            print("Error: Selected entity does not have a valid ID.")
+            return False
+            
+        entity_name = self.selected_entity.get("name", "Unknown")
+        print(f"\nFetching resources for entity {entity_name}...")
+            
+        entity_details = self.client.get_virtual_entity_resources(ve_id)
+        resources = entity_details.get("resources", [])
         
-        if not self.select_time_range():
+        if not resources:
+            print("No resources found for this entity.")
+            return False
+
+        if not self.select_time_range(resources=resources):
             return False
         
         try:
-            if not isinstance(self.client, GlowmarktClient):
-                print("Error: Client is not a GlowmarktClient instance.")
-                return False
-                
-            if not self.selected_entity:
-                print("Error: No entity selected.")
-                return False
-                
-            ve_id = self.selected_entity.get("veId", None)
-            if not ve_id:
-                print("Error: Selected entity does not have a valid ID.")
-                return False
-                
-            entity_name = self.selected_entity.get("name", "Unknown")
-            print(f"\nFetching resources for entity {entity_name}...")
-                
-            entity_details = self.client.get_virtual_entity_resources(ve_id)
-            resources = entity_details.get("resources", [])
-            
-            if not resources:
-                print("No resources found for this entity.")
-                return False
-            
-            valid_resources = []
-            for resource in resources:
-                name = resource.get("name", "Unknown")
-                classifier = resource.get("classifier", "Unknown")
-                
-                if "consumption" in classifier:
-                    valid_resources.append(resource)
-            
-            if not valid_resources:
-                print("No consumption resources found.")
-                return False
-            
-            print(f"\nFound {len(valid_resources)} consumption resources.")
-            
             # Download all resources using the _download_all_resources method
-            downloaded_filepaths = self._download_all_resources(valid_resources)
+            downloaded_filepaths = self._download_all_resources(resources)
             
             if downloaded_filepaths:
                 print(f"\nSuccessfully downloaded {len(downloaded_filepaths)} resources.")
@@ -863,3 +902,24 @@ class DataRetrievalUI(BaseUI):
             
             print("\nNo files were successfully retrieved.")
             return False
+    
+    def _get_month_ranges(self, start_date, end_date):
+        """Yield (month_start, month_end) tuples for the range [start_date, end_date]."""
+        current_start = start_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        while current_start <= end_date:
+            next_month = current_start.month + 1
+            next_year = current_start.year
+            if next_month > 12:
+                next_month = 1
+                next_year += 1
+            
+            month_end = datetime(next_year, next_month, 1) - timedelta(seconds=1)
+            
+            # Clip to the actual start and end dates
+            actual_start = max(current_start, start_date)
+            actual_end = min(month_end, end_date)
+            
+            if actual_start <= actual_end:
+                yield actual_start, actual_end
+                
+            current_start = datetime(next_year, next_month, 1)
