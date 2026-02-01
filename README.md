@@ -1,23 +1,49 @@
-# Glowmarkt API dabbling
+# Energy pipeline
 
-The Hildebrand Glowmarkt API (should) allows people to retrieve their energy data over an API.
+A small CLI app to collect energy data from different providers, convert their data into a shared data format and create visualisations from the data.
 
-You can run the project using `python -m pipeline`
+It's also a playground to explore and refine my agentic coding setup.
 
-## Tools
+## Currently Supported Providers
+
+- Hildebrand Glowmarkt API
+- n3rgy .json files (downloaded from their personal account)
+
+## Tools used
+
 - [Bruno](https://www.usebruno.com/) scripts to manually explore the API
 - Python for the data pipeline
 
-## Python setup
-python env setup, as suggested in a post on [staticnet.io](https://staticnet.io/macos-python-dev-env/)
+## Getting Started
 
-- install python - I propose to use asdf for python version management. Install it, then execute `asdf install` on the root folder (using .tool-versions)
-- use python virtual environments for local dependency management
-    - use `source .venv/bin/activate` to start and `deactivate` to stop
-    - install all required packages using `pip install .`
-- run tests with `pytest`
-- run the pipeline with `python -m pipeline`
+The `go.sh` script in the root directory provides a convenient way to run common tasks. Run go without arguments to see a list of available commands
 
-## Todos
-- use just
-- actually write the code =o)
+### Environment Setup
+
+1.  **Python Version:** The project uses Python 3.8 or higher. It is recommended to use a version manager like `asdf` to manage Python versions. The `.tool-versions` file specifies the exact Python version.
+2.  **Virtual Environment:** Use a virtual environment to manage project dependencies. Create a new environment by running:
+    ```bash
+    ./go.sh create-env
+    ```
+    Activate the environment with:
+    ```bash
+    source .venv/bin/activate
+    ```
+3.  **Install Dependencies:** Install the required dependencies from `pyproject.toml`:
+    ```bash
+    ./go.sh install
+    ```
+
+### Running the Application
+
+The main application can be run using the following command:
+
+```bash
+./go.sh run
+```
+
+This will launch an interactive command-line interface (CLI) that allows you to choose from various options, such as retrieving data, converting data formats, and visualizing data.
+
+### Testing the Application
+
+The `go.sh` command has a few arguments to run the tests, run the linter and `go.sh check` to run tests and linting together.
