@@ -16,7 +16,7 @@ The `ui` directory contains the modules that make up the command-line interface 
 ### `data_retrieval_ui.py`
 
 -   **Purpose:** This module provides the UI for the data retrieval functionality.
--   **Functionality:** It prompts the user for the necessary information, such as the data source and the time period, and then initiates the data retrieval process.
+-   **Functionality:** It automates the selection of resources and time ranges, detecting the latest available local data to fetch only missing records.
 
 ### `data_converter_ui.py`
 

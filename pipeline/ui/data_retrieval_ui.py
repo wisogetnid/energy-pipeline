@@ -1,7 +1,6 @@
 import os
 import json
 from datetime import datetime, timedelta
-from dateutil import parser
 from pathlib import Path
 import tempfile
 import shutil
@@ -221,105 +220,39 @@ class DataRetrievalUI(BaseUI):
             print(f"Automatically selected {len(resources)} resources.")
             return resources
         return []
-    def select_time_range(self, preset=None, resources=None):
+    def select_time_range(self, resources=None):
         self.print_header("Time Range Selection")
         
         now = datetime.now()
-        current_year = now.year
-        current_month = now.month
         
-        if preset:
-            choice = {"select_month": 1, "custom": 2, "latest": 3}.get(preset, 1)
-        else:
-            print("Choose a date range:")
-            print("1. Select month and year")
-            print("2. Custom range (enter specific dates)")
-            print("3. Get latest data (automatic)")
+        # N3rgy is file-based and doesn't need date range selection
+        if self.client_type == 'n3rgy':
+            self.is_latest_fetch = False
+            self.date_range = "all available data from processed files"
+            return True
+
+        try:
+            if not resources:
+                print("Error: Resources must be selected before determining latest date.")
+                return False
             
-            choice = self.get_int_input("\nSelect a range: ", 1, 3)
-        
-        if choice == 1:
-            self.is_latest_fetch = False
-            try:
-                print("\nSelect month:")
-                month_names = [
-                    "January", "February", "March", "April", 
-                    "May", "June", "July", "August",
-                    "September", "October", "November", "December"
-                ]
-                
-                for i, month_name in enumerate(month_names, 1):
-                    print(f"{i}. {month_name}")
-                
-                month = self.get_int_input("\nEnter month (1-12): ", 1, 12)
-                
-                print(f"\nEnter year (default: {current_year}):")
-                year_input = input(f"Year [{current_year}]: ")
-                
-                if not year_input.strip():
-                    year = current_year
-                else:
-                    try:
-                        year = int(year_input)
-                        if year < 2000 or year > 2100:
-                            print("Year should be between 2000 and 2100, using current year instead.")
-                            year = current_year
-                    except ValueError:
-                        print("Invalid year format, using current year instead.")
-                        year = current_year
-                
-                self.start_date = datetime(year, month, 1)
-                
-                if month == 12:
-                    self.end_date = datetime(year + 1, 1, 1) - timedelta(seconds=1)
-                else:
-                    self.end_date = datetime(year, month + 1, 1) - timedelta(seconds=1)
-                
-                self.date_range = f"{month_names[month-1]} {year}"
-                
-            except Exception as e:
-                print(f"Error setting month and year: {str(e)}")
-                return False
-        
-        elif choice == 2:
-            self.is_latest_fetch = False
-            try:
-                start_input = input("\nEnter start date (YYYY-MM-DD): ")
-                self.start_date = parser.parse(start_input)
-                
-                end_input = input("Enter end date (YYYY-MM-DD): ")
-                self.end_date = parser.parse(end_input)
-                
-                if self.start_date > self.end_date:
-                    print("Error: Start date must be before end date")
-                    return False
-                
-                self.date_range = f"custom range: {self.start_date.date()} to {self.end_date.date()}"
-            except Exception as e:
-                print(f"Error parsing dates: {str(e)}")
-                return False
-        elif choice == 3:
-            try:
-                if not resources:
-                    print("Error: Resources must be selected before determining latest date.")
-                    return False
-                
-                print("Detecting latest available data...")
-                data_dir = self._get_data_directory()
-                resource_names = [r.get("name") for r in resources if r.get("name")]
-                
-                self.start_date = get_latest_available_date(data_dir, resource_names)
-                self.end_date = now
-                self.is_latest_fetch = True
-                
-                self.date_range = f"latest data: {self.start_date.date()} to {self.end_date.date()}"
-                print(f"Detected latest sync point. Starting from: {self.start_date.date()}")
-            except Exception as e:
-                print(f"Error determining latest date: {str(e)}")
-                return False
-    
-        print(f"\nSelected date range: {self.date_range}")
-        return True
+            print("Detecting latest available data...")
+            data_dir = self._get_data_directory()
+            resource_names = [r.get("name") for r in resources if r.get("name")]
+            
+            # Use the latest date service to find where to start
+            # This identifies the latest date across all resources and uses its start date as the sync point
+            self.start_date = get_latest_available_date(data_dir, resource_names)
+            self.end_date = now
+            self.is_latest_fetch = True
+            
+            self.date_range = f"{self.start_date.date()} to {self.end_date.date()}"
+            print(f"Detected latest sync point. Starting from: {self.start_date.date()}")
+            print(f"\nSelected date range: {self.date_range}")
+            return True
+        except Exception as e:
+            print(f"Error determining latest date: {str(e)}")
+            return False
     
     def retrieve_data(self, skip_if_exists=True):
         self.print_header("Retrieving Data")
@@ -546,8 +479,8 @@ class DataRetrievalUI(BaseUI):
                         self.date_range = f"{month_start.date()} to {month_end.date()}"
                         
                         print(f"\nFetching month: {self.date_range}")
-                        # Respect skip_if_exists to avoid redundant downloads
-                        readings = self.retrieve_data(skip_if_exists=True)
+                        # Force overwrite to ensure we refresh any partial/corrupted data
+                        readings = self.retrieve_data(skip_if_exists=False)
                         if readings:
                             filepath = self.save_data(readings)
                             if filepath:

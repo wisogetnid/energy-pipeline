@@ -45,12 +45,15 @@ def get_latest_available_date(data_dir: str, resource_names: List[str], default_
         if latest_end:
             resource_latest_dates[resource] = latest_end
             resource_pivot_starts[resource] = pivot_start
+        else:
+            # If ANY requested resource is missing local data, start from the default date
+            return default_date
 
     if not resource_latest_dates:
         return default_date
 
-    # Cross-Resource Sync: Use the earliest of these "latest dates"
-    global_sync_date = min(resource_latest_dates.values())
+    # Cross-Resource Sync: Use the earliest of these "latest dates" to find which resource is furthest behind
+    furthest_behind_resource = min(resource_latest_dates, key=resource_latest_dates.get)
     
-    # Return the global sync date. The retrieval logic will start from here.
-    return global_sync_date
+    # Return the start date of that file to trigger an overwrite/refresh of the latest month
+    return resource_pivot_starts[furthest_behind_resource]

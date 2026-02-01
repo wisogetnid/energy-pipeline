@@ -25,8 +25,8 @@ def test_get_latest_available_date_single_resource(temp_data_dir):
     Path(temp_data_dir, "electricity_20250201_to_20250228.json").touch()
     
     result = get_latest_available_date(temp_data_dir, ["Electricity"])
-    # Should return the end date of the latest file to use as new sync point
-    assert result == datetime(2025, 2, 28)
+    # Should return the start date of the latest file to use as new sync point (pivot)
+    assert result == datetime(2025, 2, 1)
 
 def test_get_latest_available_date_multiple_resources_sync(temp_data_dir):
     # Electricity up to Feb
@@ -45,12 +45,13 @@ def test_get_latest_available_date_multiple_resources_sync(temp_data_dir):
     result = get_latest_available_date(temp_data_dir, resources)
     
     # Latest dates are:
-    # Elec cons: 2025-02-28
-    # Gas cons: 2025-01-31
-    # Elec cost: 2025-02-28
-    # Global sync date (min of latests) is 2025-01-31.
+    # Elec cons: 2025-02-28 (start 2025-02-01)
+    # Gas cons: 2025-01-31 (start 2025-01-01)
+    # Elec cost: 2025-02-28 (start 2025-02-01)
+    # Global sync point (min of latest ends) is 2025-01-31.
+    # The start date of the file ending on 2025-01-31 is 2025-01-01.
     
-    assert result == datetime(2025, 1, 31)
+    assert result == datetime(2025, 1, 1)
 
 def test_get_latest_available_date_no_matching_files(temp_data_dir):
     Path(temp_data_dir, "random_file.json").touch()
@@ -64,4 +65,4 @@ def test_get_latest_available_date_case_insensitivity(temp_data_dir):
     Path(temp_data_dir, "electricity_consumption_20250101_to_20250131.json").touch()
     
     result = get_latest_available_date(temp_data_dir, ["ELECTRICITY CONSUMPTION"])
-    assert result == datetime(2025, 1, 31)
+    assert result == datetime(2025, 1, 1)
