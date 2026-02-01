@@ -528,8 +528,54 @@ class VisualizationUI(BaseUI):
         plt.tight_layout()
         plt.savefig(costStackedPath)
         plt.close()
+
+        for resource_type in ["electricity", "gas"]:
+            if resource_type in resource_keys:
+                plt.figure(figsize=(14, 8))
+                for idx, year in enumerate(year_list):
+                    resource_months_ = year_resource_month[year]
+                    vals = resource_months_.get(resource_type, [0] * 12)
+                    plt.bar(
+                        x + idx * bar_width,
+                        vals,
+                        bar_width,
+                        label=f"{year} {resource_type}",
+                        color=base_colors[idx % len(base_colors)],
+                    )
+                plt.title(f"Monthly {resource_type.capitalize()} Consumption Comparison")
+                plt.xlabel("Month")
+                plt.ylabel("Consumption")
+                plt.xticks(
+                    x + bar_width * (len(year_list) - 1) / 2,
+                    [
+                        "Jan",
+                        "Feb",
+                        "Mar",
+                        "Apr",
+                        "May",
+                        "Jun",
+                        "Jul",
+                        "Aug",
+                        "Sep",
+                        "Oct",
+                        "Nov",
+                        "Dec",
+                    ],
+                )
+                plt.legend()
+                plt.grid(True, linestyle="--", alpha=0.7)
+                specific_path = (
+                    visualisationsDir
+                    / f"yearly_resource_consumption_{resource_type}.png"
+                )
+                plt.tight_layout()
+                plt.savefig(specific_path)
+                plt.close()
+
         print(f"Created overlaid yearly comparison charts:")
         print(f"- Resource Consumption (stacked): {consumptionPath}")
+        print(f"- Electricity Consumption: {visualisationsDir / 'yearly_resource_consumption_electricity.png'}")
+        print(f"- Gas Consumption: {visualisationsDir / 'yearly_resource_consumption_gas.png'}")
         print(f"- Resource Cost (stacked): {costStackedPath}")
         print(f"- Cost (line): {costPath}")
 
