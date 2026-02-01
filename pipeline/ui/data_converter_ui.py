@@ -75,7 +75,7 @@ class DataConverterUI(BaseUI):
 
         converter_menu_options = {
             "1": "Combine all resources into a single JSONL file",
-            "2": "Convert data to yearly JSONL files",
+            "2": "Convert Monthly to Yearly (JSONL & Parquet)",
             "3": "Exit",
         }
 
@@ -99,12 +99,7 @@ class DataConverterUI(BaseUI):
             self.combine_all_resources(selected_directory)
 
     def run_yearly_conversion(self):
-        self.print_header("Convert to Yearly JSONL")
-
-        target_directory = self.get_directory()
-        if not target_directory:
-            return None
-
+        target_directory = self.data_dir
         available_jsonl_files = list(target_directory.glob("*.jsonl"))
 
         if not available_jsonl_files:
@@ -121,7 +116,7 @@ class DataConverterUI(BaseUI):
         for jsonl_file in available_jsonl_files:
             print(f" - {jsonl_file.name}")
 
-        print(f"\nConverting data from {target_directory} to yearly JSONL files...")
+        print(f"\nConverting data from {target_directory} to yearly JSONL and Parquet files...")
 
         yearly_converter = YearlyEnergyDataConverter(output_dir=self.output_dir)
 
@@ -148,25 +143,20 @@ class DataConverterUI(BaseUI):
             )
             print(f"Files saved to: {self.output_dir}")
 
-            convert_to_parquet_requested = self.get_yes_no_input(
-                "\nWould you like to convert these yearly files to Parquet format? (y/n): "
+            print("\nConverting yearly JSONL files to Parquet format...")
+            parquet_converter = JsonlToParquetConverter()
+            successfully_converted_parquet_files = (
+                parquet_converter.convert_multiple_jsonl_files(
+                    conversion_result_files
+                )
             )
 
-            if convert_to_parquet_requested:
-                print("\nConverting yearly JSONL files to Parquet format...")
-                parquet_converter = JsonlToParquetConverter()
-                successfully_converted_parquet_files = (
-                    parquet_converter.convert_multiple_jsonl_files(
-                        conversion_result_files
-                    )
+            if successfully_converted_parquet_files:
+                print(
+                    f"\nSuccessfully converted {len(successfully_converted_parquet_files)} files to Parquet format:"
                 )
-
-                if successfully_converted_parquet_files:
-                    print(
-                        f"\nSuccessfully converted {len(successfully_converted_parquet_files)} files to Parquet format:"
-                    )
-                    for parquet_file_path in successfully_converted_parquet_files:
-                        print(f" - {parquet_file_path}")
+                for parquet_file_path in successfully_converted_parquet_files:
+                    print(f" - {parquet_file_path}")
 
         return conversion_result_files
 

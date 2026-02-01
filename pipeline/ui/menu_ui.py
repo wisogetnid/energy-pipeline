@@ -92,7 +92,7 @@ class MenuUI(BaseUI):
         self.print_header("Convert Data")
 
         print("1. Combine Raw .json Resources to Monthly .jsonl Files")
-        print("2. Combine Monthly .jsonl Files into Yearly .jsonl Files")
+        print("2. Convert Monthly .jsonl Files to Yearly Parquet")
         print("3. Convert Processed .jsonl Files into .parquet Files")
         print("4. Back to Main Menu")
 
