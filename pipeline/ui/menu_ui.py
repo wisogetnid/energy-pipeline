@@ -23,7 +23,7 @@ class MenuUI(BaseUI):
             print("1. Retrieve Data")
             print("2. Convert Data")
             print("3. Visualise Data")
-            print("4. Retrieve Token")
+            print("4. Display API Token")
             print("5. Exit")
             
             choice = self.get_int_input("\nEnter choice (1-5): ", 1, 5)
@@ -35,7 +35,7 @@ class MenuUI(BaseUI):
             elif choice == 3:
                 self.visualisation_menu()
             elif choice == 4:
-                self.retrieve_token()
+                self.display_api_token()
             elif choice == 5:
                 print("\nExiting Energy Pipeline. Goodbye!")
                 break
@@ -165,8 +165,8 @@ class MenuUI(BaseUI):
     def wait_for_user(self):
         input("\nPress Enter to continue...")
     
-    def retrieve_token(self):
-        self.print_header("Retrieve Token")
+    def display_api_token(self):
+        self.print_header("API Token Information")
 
         from pipeline.utils.credentials import get_credentials
         username, password, token = get_credentials()
@@ -175,7 +175,6 @@ class MenuUI(BaseUI):
             print(f"\nSuccess! Your token is: {token}")
         else:
             try:
-                # Use the client to authenticate and get a new token
                 if not self.retrieval_ui.client or not isinstance(self.retrieval_ui.client, GlowmarktClient):
                     self.retrieval_ui.client_type = 'glowmarkt'
                     self.retrieval_ui.setup_glowmarkt_client(username, password)

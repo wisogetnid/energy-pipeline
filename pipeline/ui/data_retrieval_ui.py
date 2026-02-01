@@ -111,7 +111,6 @@ class DataRetrievalUI(BaseUI):
             return False
     
     def ensure_client_initialized(self):
-        """Ensure that the client is initialized and valid."""
         if not self.client:
             raise ValueError("Client is not initialized. Please set up the client first.")
 
@@ -152,7 +151,6 @@ class DataRetrievalUI(BaseUI):
             return False
 
     def _select_glowmarkt_resource(self):
-        """Automatically fetch and select all resources for Glowmarkt."""
         self.ensure_client_initialized()
 
         if not isinstance(self.client, GlowmarktClient):
@@ -185,7 +183,6 @@ class DataRetrievalUI(BaseUI):
             return []
 
     def _select_n3rgy_resource(self):
-        """Automatically fetch all resources for N3rgy."""
         self.ensure_client_initialized()
 
         if not isinstance(self.client, N3rgyCSVClient):
@@ -208,7 +205,6 @@ class DataRetrievalUI(BaseUI):
             return []
 
     def select_resource(self):
-        """Automatically retrieve all resources based on the client type."""
         if self.client_type == 'glowmarkt':
             resources = self._select_glowmarkt_resource()
         elif self.client_type == 'n3rgy':
@@ -225,7 +221,6 @@ class DataRetrievalUI(BaseUI):
         
         now = datetime.now()
         
-        # N3rgy is file-based and doesn't need date range selection
         if self.client_type == 'n3rgy':
             self.is_latest_fetch = False
             self.date_range = "all available data from processed files"
@@ -240,8 +235,6 @@ class DataRetrievalUI(BaseUI):
             data_dir = self._get_data_directory()
             resource_names = [r.get("name") for r in resources if r.get("name")]
             
-            # Use the latest date service to find where to start
-            # This identifies the latest date across all resources and uses its start date as the sync point
             self.start_date = get_latest_available_date(data_dir, resource_names)
             self.end_date = now
             self.is_latest_fetch = True
@@ -329,7 +322,6 @@ class DataRetrievalUI(BaseUI):
             return None
     
     def _get_data_directory(self):
-        """Ensure the data directory exists and return its path."""
         if self.client_type == 'glowmarkt':
             data_dir = os.path.join("data", "glowmarkt_api_raw")
         elif self.client_type == 'n3rgy_api':
@@ -374,18 +366,16 @@ class DataRetrievalUI(BaseUI):
         try:
             data_dir = self._get_data_directory()
             
-            # Handle potential None values with safe defaults
-            resource_name = self.selected_resource_name or "unknown_resource"
-            resource_name_safe = resource_name.lower().replace(" ", "_")
+            safe_resource_name = (self.selected_resource_name or "unknown_resource").lower().replace(" ", "_")
             
             start_date_str = self.start_date.strftime("%Y%m%d") if isinstance(self.start_date, datetime) else "unknown"
             end_date_str = self.end_date.strftime("%Y%m%d") if isinstance(self.end_date, datetime) else "unknown"
-            filename = f"{resource_name_safe}_{start_date_str}_to_{end_date_str}.json"
+            filename = f"{safe_resource_name}_{start_date_str}_to_{end_date_str}.json"
             filepath = os.path.join(data_dir, filename)
             
             data = {
                 "resource_id": self.selected_resource_id or "unknown",
-                "resource_name": resource_name,
+                "resource_name": self.selected_resource_name or "unknown_resource",
                 "resource_unit": self.selected_resource_unit or "unknown",
                 "resource_classifier": self.selected_resource_classifier or "unknown",
                 "start_date": self.start_date.isoformat() if isinstance(self.start_date, datetime) else self.start_date,
@@ -407,7 +397,6 @@ class DataRetrievalUI(BaseUI):
             return None
     
     def run(self):
-        """Main method to run the data retrieval process."""
         if not self.client:
             if not self.select_data_source():
                 return
@@ -417,17 +406,14 @@ class DataRetrievalUI(BaseUI):
             if not self.select_entity():
                 return
         
-        # Select all resources
         resources = self.select_resource()
         if not resources:
             print("No resources available or selection failed.")
             return
         
-        # Select time range for all resources
         if not self.select_time_range(resources=resources):
             return
         
-        # Process and download each resource
         downloaded_filepaths = self._download_all_resources(resources)
         
         if downloaded_filepaths:
@@ -438,28 +424,24 @@ class DataRetrievalUI(BaseUI):
             return None
     
     def _download_all_resources(self, resources):
-        """Download data for all resources."""
         self.print_header("Downloading Resources")
         
         downloaded_filepaths = []
         failed_resources = []
         
-        # Store original start/end dates if we're doing a multi-month fetch
-        original_start = self.start_date
-        original_end = self.end_date
+        original_fetch_start = self.start_date
+        original_fetch_end = self.end_date
         
         for i, resource in enumerate(resources, 1):
             try:
                 print(f"\nProcessing resource {i}/{len(resources)}...")
                 
-                # Set resource properties based on client type
                 if self.client_type == 'glowmarkt':
                     self.selected_resource_id = resource.get("resourceId")
                     self.selected_resource_name = resource.get("name", "Unknown")
                     self.selected_resource_unit = resource.get("baseUnit", "Unknown")
                     self.selected_resource_classifier = resource.get("classifier", "Unknown")
                 elif self.client_type == 'n3rgy':
-                    # For N3rgy, the resource is a filepath
                     self.selected_resource_id = resource
                     resource_filename = Path(resource).stem
                     self.selected_resource_name = resource_filename
@@ -469,17 +451,15 @@ class DataRetrievalUI(BaseUI):
                 print(f"Retrieving data for: {self.selected_resource_name}")
                 
                 if self.is_latest_fetch:
-                    # Multi-month fetch split into monthly chunks
-                    month_ranges = list(self._get_month_ranges(original_start, original_end))
-                    print(f"Splitting fetch into {len(month_ranges)} monthly chunks...")
+                    monthly_chunks = list(self._get_month_ranges(original_fetch_start, original_fetch_end))
+                    print(f"Splitting fetch into {len(monthly_chunks)} monthly chunks...")
                     
-                    for month_start, month_end in month_ranges:
+                    for month_start, month_end in monthly_chunks:
                         self.start_date = month_start
                         self.end_date = month_end
                         self.date_range = f"{month_start.date()} to {month_end.date()}"
                         
                         print(f"\nFetching month: {self.date_range}")
-                        # Force overwrite to ensure we refresh any partial/corrupted data
                         readings = self.retrieve_data(skip_if_exists=False)
                         if readings:
                             filepath = self.save_data(readings)
@@ -488,7 +468,6 @@ class DataRetrievalUI(BaseUI):
                         else:
                             print(f"No data retrieved for {self.selected_resource_name} in range {self.date_range}")
                 else:
-                    # Regular single-range fetch
                     readings = self.retrieve_data()
                     if readings:
                         self.display_readings(readings)
@@ -507,9 +486,8 @@ class DataRetrievalUI(BaseUI):
                 failed_resources.append(self.selected_resource_name or f"Resource {i}")
                 print(f"Error processing resource: {str(e)}")
         
-        # Restore original dates
-        self.start_date = original_start
-        self.end_date = original_end
+        self.start_date = original_fetch_start
+        self.end_date = original_fetch_end
         
         if failed_resources:
             print("\nFailed to download these resources:")
@@ -521,32 +499,29 @@ class DataRetrievalUI(BaseUI):
     def fetch_and_combine_resources(self):
         self.print_header("Combine Resources")
         
-
-        data_dir = Path("data")
+        data_directory = Path("data")
         
-
-        valid_dirs = []
-        for subdir in data_dir.iterdir():
+        directories_with_json_data = []
+        for subdir in data_directory.iterdir():
             if subdir.is_dir() and list(subdir.glob("*.json")):
-                valid_dirs.append(subdir)
+                directories_with_json_data.append(subdir)
         
-        if not valid_dirs:
+        if not directories_with_json_data:
             print("No directories with JSON files found in 'data' folder.")
             return False
         
         print("\nAvailable data sources:")
-        for i, directory in enumerate(valid_dirs, 1):
-            json_count = len(list(directory.glob("*.json")))
-            print(f"{i}. {directory.name} ({json_count} JSON files)")
+        for i, directory in enumerate(directories_with_json_data, 1):
+            json_file_count = len(list(directory.glob("*.json")))
+            print(f"{i}. {directory.name} ({json_file_count} JSON files)")
         
         if self.client:
-            print(f"{len(valid_dirs) + 1}. Use current {self.client_type} client to fetch new data")
+            print(f"{len(directories_with_json_data) + 1}. Use current {self.client_type} client to fetch new data")
         
-        max_option = len(valid_dirs) + (1 if self.client else 0)
-        choice = self.get_int_input("\nSelect data source: ", 1, max_option)
+        max_source_option = len(directories_with_json_data) + (1 if self.client else 0)
+        source_choice = self.get_int_input("\nSelect data source: ", 1, max_source_option)
         
-
-        if self.client and choice == len(valid_dirs) + 1:
+        if self.client and source_choice == len(directories_with_json_data) + 1:
             if self.client_type == 'glowmarkt':
                 if not self.selected_entity:
                     if not self.select_entity():
@@ -555,72 +530,64 @@ class DataRetrievalUI(BaseUI):
             else:
                 return self._fetch_and_combine_n3rgy_resources()
         
-
-        selected_dir = valid_dirs[choice - 1]
-        return self._process_existing_json_files(selected_dir)
+        selected_directory = directories_with_json_data[source_choice - 1]
+        return self._process_existing_json_files(selected_directory)
 
     def _process_existing_json_files(self, directory):
         self.print_header(f"Processing Files from {directory.name}")
         
-
-        temp_dir = Path(tempfile.mkdtemp(prefix="energy_data_"))
-        print(f"\nCreating temporary directory for data processing: {temp_dir}")
+        temporary_processing_directory = Path(tempfile.mkdtemp(prefix="energy_data_"))
+        print(f"\nCreating temporary directory for data processing: {temporary_processing_directory}")
         
-
-        json_files = list(directory.glob("*.json"))
-        print(f"\nFound {len(json_files)} JSON files in {directory}")
+        json_files_to_process = list(directory.glob("*.json"))
+        print(f"\nFound {len(json_files_to_process)} JSON files in {directory}")
         
-
-        resource_types = set()
-        for json_file in json_files:
+        detected_resource_types = set()
+        for json_file in json_files_to_process:
             filename = json_file.name.lower()
             if "electricity" in filename:
-                resource_types.add("electricity")
+                detected_resource_types.add("electricity")
             elif "gas" in filename:
-                resource_types.add("gas")
+                detected_resource_types.add("gas")
             elif "water" in filename:
-                resource_types.add("water")
+                detected_resource_types.add("water")
         
-        print(f"Resource types found: {', '.join(resource_types)}")
+        print(f"Resource types found: {', '.join(detected_resource_types)}")
         
-
-        retrieved_files = []
-        for json_file in json_files:
-            temp_filepath = temp_dir / json_file.name
+        prepared_files = []
+        for json_file in json_files_to_process:
+            temporary_filepath = temporary_processing_directory / json_file.name
             
-
-            with open(json_file, 'r') as src_file, open(temp_filepath, 'w') as dst_file:
-                dst_file.write(src_file.read())
+            with open(json_file, 'r') as source_reader, open(temporary_filepath, 'w') as temp_writer:
+                temp_writer.write(source_reader.read())
             
-            retrieved_files.append(str(temp_filepath))
+            prepared_files.append(str(temporary_filepath))
         
-
         try:
-            from_date = "unknown"
-            to_date = "unknown"
-            for json_file in json_files:
+            detected_from_date = "unknown"
+            detected_to_date = "unknown"
+            for json_file in json_files_to_process:
                 with open(json_file, 'r') as f:
                     data = json.load(f)
                     from_date_value = data.get("start_date", data.get("query", {}).get("from", None))
                     to_date_value = data.get("end_date", data.get("query", {}).get("to", None))
-                    if from_date_value and from_date == "unknown":
-                        from_date = from_date_value
-                    if to_date_value and to_date == "unknown":
-                        to_date = to_date_value
+                    if from_date_value and detected_from_date == "unknown":
+                        detected_from_date = from_date_value
+                    if to_date_value and detected_to_date == "unknown":
+                        detected_to_date = to_date_value
             
-            if isinstance(from_date, str) and 'T' in from_date:
-                from_date = from_date.split('T')[0]
-            if isinstance(to_date, str) and 'T' in to_date:
-                to_date = to_date.split('T')[0]
+            if isinstance(detected_from_date, str) and 'T' in detected_from_date:
+                detected_from_date = detected_from_date.split('T')[0]
+            if isinstance(detected_to_date, str) and 'T' in detected_to_date:
+                detected_to_date = detected_to_date.split('T')[0]
                 
-            print(f"Date range found: {from_date} to {to_date}")
+            print(f"Date range found: {detected_from_date} to {detected_to_date}")
         except Exception as e:
             print(f"Could not determine date range: {e}")
         
-        return self._process_combined_files(retrieved_files, [], [], temp_dir)
+        return self._process_combined_files(prepared_files, [], [], temporary_processing_directory)
     
     def _fetch_and_combine_glowmarkt_resources(self):
-        """Fetch and combine all resources from Glowmarkt."""
         self.ensure_client_initialized()
         
         if not self.selected_entity:
@@ -650,7 +617,6 @@ class DataRetrievalUI(BaseUI):
             return False
         
         try:
-            # Download all resources using the _download_all_resources method
             downloaded_filepaths = self._download_all_resources(resources)
             
             if downloaded_filepaths:
@@ -665,7 +631,6 @@ class DataRetrievalUI(BaseUI):
             return False
     
     def _fetch_and_combine_n3rgy_resources(self):
-        """Fetch and combine all resources from N3rgy CSV files."""
         self.ensure_client_initialized()
         
         if not isinstance(self.client, N3rgyCSVClient):
@@ -730,7 +695,6 @@ class DataRetrievalUI(BaseUI):
             
             print("\nCombining resources into a single file...")
             from pipeline.data_processing.jsonl_converter import EnergyDataConverter
-            
 
             output_dir = Path("data/processed")
             
@@ -745,9 +709,7 @@ class DataRetrievalUI(BaseUI):
                     print(f"\nAll resources successfully combined into {len(combined_filepath)} monthly files:")
                     for filepath in combined_filepath:
                         print(f"- {filepath}")
-                    
 
-                    print("\nWould you like to convert these files to Parquet format?")
                     convert_to_parquet = self.get_yes_no_input("Convert to Parquet? (y/n): ")
                     
                     if convert_to_parquet:
@@ -767,7 +729,6 @@ class DataRetrievalUI(BaseUI):
                             print(f"\nSuccessfully converted {len(parquet_filepaths)} files to Parquet format:")
                             for filepath in parquet_filepaths:
                                 print(f"- {filepath}")
-                    
 
                     original_paths = []
                     data_dir = self._get_data_directory()
@@ -775,7 +736,6 @@ class DataRetrievalUI(BaseUI):
                         filename = Path(temp_path).name
                         original_path = os.path.join(data_dir, filename)
                         original_paths.append(original_path)
-                    
 
                     import shutil
                     shutil.rmtree(temp_dir)
@@ -794,7 +754,6 @@ class DataRetrievalUI(BaseUI):
                     
                     if parquet_filepath:
                         print(f"\nSuccessfully converted to Parquet format: {parquet_filepath}")
-                        
 
                         original_paths = []
                         data_dir = self._get_data_directory()
@@ -802,7 +761,6 @@ class DataRetrievalUI(BaseUI):
                             filename = Path(temp_path).name
                             original_path = os.path.join(data_dir, filename)
                             original_paths.append(original_path)
-                        
 
                         import shutil
                         shutil.rmtree(temp_dir)
@@ -810,14 +768,12 @@ class DataRetrievalUI(BaseUI):
                         
                         return [parquet_filepath, combined_filepath, *original_paths]
                     else:
-
                         import shutil
                         shutil.rmtree(temp_dir)
                         print(f"\nTemporary directory removed: {temp_dir}")
                         
                         return [combined_filepath]
             else:
-
                 import shutil
                 shutil.rmtree(temp_dir)
                 print(f"\nTemporary directory removed: {temp_dir}")
@@ -825,7 +781,6 @@ class DataRetrievalUI(BaseUI):
                 print("\nFailed to combine resources. Individual files are still available.")
                 return retrieved_files
         else:
-
             import shutil
             shutil.rmtree(temp_dir)
             print(f"\nTemporary directory removed: {temp_dir}")
@@ -834,7 +789,6 @@ class DataRetrievalUI(BaseUI):
             return False
     
     def _get_month_ranges(self, start_date, end_date):
-        """Yield (month_start, month_end) tuples for the range [start_date, end_date]."""
         current_start = start_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         while current_start <= end_date:
             next_month = current_start.month + 1
@@ -845,7 +799,6 @@ class DataRetrievalUI(BaseUI):
             
             month_end = datetime(next_year, next_month, 1) - timedelta(seconds=1)
             
-            # Clip to the actual start and end dates
             actual_start = max(current_start, start_date)
             actual_end = min(month_end, end_date)
             

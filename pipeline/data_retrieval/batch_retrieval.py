@@ -94,15 +94,10 @@ class BatchRetriever:
         start_date: datetime, 
         end_date: datetime
     ) -> List[Tuple[datetime, datetime]]:
-        """
-        Splits a date range into monthly chunks.
-        Returns a list of (month_start, month_end) tuples.
-        """
         ranges = []
         current_start = start_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
         while current_start <= end_date:
-            # Calculate next month's start
             next_month = current_start.month + 1
             next_year = current_start.year
             if next_month > 12:
@@ -111,7 +106,6 @@ class BatchRetriever:
             
             month_end_boundary = datetime(next_year, next_month, 1) - timedelta(seconds=1)
             
-            # Clip to actual range
             actual_start = max(current_start, start_date)
             actual_end = min(month_end_boundary, end_date)
             

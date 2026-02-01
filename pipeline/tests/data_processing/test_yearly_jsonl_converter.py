@@ -333,46 +333,39 @@ class TestYearlyEnergyDataConverter:
             assert abs(actual_cost - expected_cost) < 0.01
 
     def test_idempotency_with_existing_annual_summary(self, tmp_path):
-        converter_output_dir = tmp_path / "output"
-        converter_output_dir.mkdir()
-        converter = YearlyEnergyDataConverter(output_dir=str(converter_output_dir))
+        converter_output_directory = tmp_path / "output"
+        converter_output_directory.mkdir()
+        energy_converter = YearlyEnergyDataConverter(output_dir=str(converter_output_directory))
         
-        input_dir = tmp_path / "input"
-        input_dir.mkdir()
+        input_data_directory = tmp_path / "input"
+        input_data_directory.mkdir()
         
-        # 1. Create an initial annual summary file
-        annual_summary_file = converter_output_dir / "2024_annual_energy_summary.jsonl"
-        with open(annual_summary_file, 'w') as f:
-            f.write(json.dumps({
+        initial_annual_summary_path = converter_output_directory / "2024_annual_energy_summary.jsonl"
+        with open(initial_annual_summary_path, 'w') as summary_writer:
+            summary_writer.write(json.dumps({
                 'year': '2024', 'data_type': 'yearly_summary', 'consumption_total': 100, 'cost_total': 10
             }) + '\n')
-            f.write(json.dumps({
+            summary_writer.write(json.dumps({
                 'date': '2024-01-01', 'data_type': 'daily_summary', 'consumption_total': 100, 'cost_total': 10
             }) + '\n')
 
-        # 2. Create a new monthly file to be processed
-        monthly_file = input_dir / "2024-02.jsonl"
-        with open(monthly_file, 'w') as f:
-            f.write(json.dumps({
+        new_monthly_data_file = input_data_directory / "2024-02.jsonl"
+        with open(new_monthly_data_file, 'w') as data_writer:
+            data_writer.write(json.dumps({
                 'timestamp': 1706745600, 'consumption_value': 50, 'cost_value': 5
             }) + '\n')
             
-        # 3. Run the converter with both the new monthly file and the existing annual summary
-        # The bug is that it will read the annual summary and add its values to the new calculation
-        files_to_process = [str(monthly_file), str(annual_summary_file)]
-        converter.convert_to_yearly_jsonl(files_to_process)
+        files_to_process = [str(new_monthly_data_file), str(initial_annual_summary_path)]
+        energy_converter.convert_to_yearly_jsonl(files_to_process)
         
-        # 4. Check the results
-        with open(annual_summary_file, 'r') as f:
-            lines = f.readlines()
-            new_yearly_summary = json.loads(lines[0])
+        with open(initial_annual_summary_path, 'r') as summary_reader:
+            summary_lines = summary_reader.readlines()
+            updated_yearly_summary = json.loads(summary_lines[0])
             
-            # Expected: The new summary should ONLY contain data from the monthly file (50)
-            # Bug: The new summary will contain data from monthly + old annual (50 + 100 = 150)
-            expected_consumption = 50
-            actual_consumption = new_yearly_summary['consumption_total']
+            expected_consumption_total = 50
+            actual_consumption_total = updated_yearly_summary['consumption_total']
             
-            print(f"\nIdempotency Test: Expected={expected_consumption}, Actual={actual_consumption}")
+            print(f"\nIdempotency Test: Expected={expected_consumption_total}, Actual={actual_consumption_total}")
             
-            assert abs(actual_consumption - expected_consumption) < 0.01, \
-                f"Idempotency bug! Expected {expected_consumption}, got {actual_consumption}"
+            assert abs(actual_consumption_total - expected_consumption_total) < 0.01, \
+                f"Idempotency bug! Expected {expected_consumption_total}, got {actual_consumption_total}"
