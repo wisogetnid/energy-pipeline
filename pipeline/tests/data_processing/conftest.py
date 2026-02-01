@@ -3,10 +3,12 @@ import os
 import pytest
 from pathlib import Path
 
+
 def load_fixture(filename):
-    fixture_path = Path(__file__).parent / 'fixtures' / filename
-    with open(fixture_path, 'r') as f:
+    fixture_path = Path(__file__).parent / "fixtures" / filename
+    with open(fixture_path, "r") as f:
         return json.load(f)
+
 
 @pytest.fixture
 def electricity_consumption_data():
@@ -19,12 +21,9 @@ def electricity_consumption_data():
         "end_date": "2025-02-28T00:00:00",
         "period": "PT30M",
         "timezone_offset": 0,
-        "readings": [
-            [1738368000, 0.047],
-            [1738369800, 0.059],
-            [1738371600, 0.039]
-        ]
+        "readings": [[1738368000, 0.047], [1738369800, 0.059], [1738371600, 0.039]],
     }
+
 
 @pytest.fixture
 def electricity_cost_data():
@@ -40,6 +39,6 @@ def electricity_cost_data():
         "readings": [
             [1738368000, 0.78773],
             [1738369800, 0.44709],
-            [1738371600, 0.5123]
-        ]
+            [1738371600, 0.5123],
+        ],
     }

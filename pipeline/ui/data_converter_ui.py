@@ -1,5 +1,3 @@
-
-
 from pathlib import Path
 
 from pipeline.data_processing.yearly_jsonl_converter import YearlyEnergyDataConverter
@@ -19,14 +17,24 @@ class DataConverterUI(BaseUI):
             energy_data_converter = EnergyDataConverter(output_dir=self.output_dir)
             target_data_directory = Path(directory) if directory else self.data_dir
 
-            combined_jsonl_filepath = energy_data_converter.combine_all_resources_into_single_file(target_data_directory)
+            combined_jsonl_filepath = (
+                energy_data_converter.combine_all_resources_into_single_file(
+                    target_data_directory
+                )
+            )
 
             if not combined_jsonl_filepath:
-                print(f"\nNo matching resources found to combine in {target_data_directory}.")
+                print(
+                    f"\nNo matching resources found to combine in {target_data_directory}."
+                )
                 return None
 
-            print(f"\nAll resources successfully combined into JSONL format: {combined_jsonl_filepath}")
-            print("Each line contains data for all resource types (electricity, gas, etc.) for the same timestamp.")
+            print(
+                f"\nAll resources successfully combined into JSONL format: {combined_jsonl_filepath}"
+            )
+            print(
+                "Each line contains data for all resource types (electricity, gas, etc.) for the same timestamp."
+            )
             return combined_jsonl_filepath
         except Exception as resource_combination_error:
             print(f"Error combining resources: {str(resource_combination_error)}")
@@ -34,20 +42,32 @@ class DataConverterUI(BaseUI):
 
     def convert_to_yearly(self, directory=None):
         try:
-            yearly_converter_instance = YearlyEnergyDataConverter(output_dir=self.output_dir)
+            yearly_converter_instance = YearlyEnergyDataConverter(
+                output_dir=self.output_dir
+            )
             target_data_directory = Path(directory) if directory else self.data_dir
-            matching_file_pairs = yearly_converter_instance.find_matching_resource_files(target_data_directory)
+            matching_file_pairs = (
+                yearly_converter_instance.find_matching_resource_files(
+                    target_data_directory
+                )
+            )
             if not matching_file_pairs:
                 print(f"\nNo matching resources found in {target_data_directory}.")
                 return None
 
-            converted_yearly_files = yearly_converter_instance.convert_to_yearly_jsonl(matching_file_pairs)
-            print(f"\nSuccessfully converted data into {len(converted_yearly_files)} yearly JSONL files.")
+            converted_yearly_files = yearly_converter_instance.convert_to_yearly_jsonl(
+                matching_file_pairs
+            )
+            print(
+                f"\nSuccessfully converted data into {len(converted_yearly_files)} yearly JSONL files."
+            )
             for file_path in converted_yearly_files:
                 print(f" - {file_path}")
             return converted_yearly_files
         except Exception as yearly_conversion_error:
-            print(f"Error converting data to yearly format: {str(yearly_conversion_error)}")
+            print(
+                f"Error converting data to yearly format: {str(yearly_conversion_error)}"
+            )
             return None
 
     def run(self):
@@ -56,7 +76,7 @@ class DataConverterUI(BaseUI):
         converter_menu_options = {
             "1": "Combine all resources into a single JSONL file",
             "2": "Convert data to yearly JSONL files",
-            "3": "Exit"
+            "3": "Exit",
         }
 
         while True:
@@ -73,56 +93,81 @@ class DataConverterUI(BaseUI):
         self.print_header("Combine All Resources")
         selected_directory = self.get_directory()
         if selected_directory:
-            print(f"\nCombining ALL resources from {selected_directory} into a single file...")
+            print(
+                f"\nCombining ALL resources from {selected_directory} into a single file..."
+            )
             self.combine_all_resources(selected_directory)
 
     def run_yearly_conversion(self):
         self.print_header("Convert to Yearly JSONL")
-        
+
         target_directory = self.get_directory()
         if not target_directory:
             return None
-        
+
         available_jsonl_files = list(target_directory.glob("*.jsonl"))
-        
+
         if not available_jsonl_files:
             print(f"\nNo JSONL files found in {target_directory}.")
-            print("You need to combine resources into monthly JSONL files first (Option 1).")
+            print(
+                "You need to combine resources into monthly JSONL files first (Option 1)."
+            )
             return None
-        
-        print(f"\nFound {len(available_jsonl_files)} JSONL files in {target_directory}.")
+
+        print(
+            f"\nFound {len(available_jsonl_files)} JSONL files in {target_directory}."
+        )
         print("Files to process:")
         for jsonl_file in available_jsonl_files:
             print(f" - {jsonl_file.name}")
-        
+
         print(f"\nConverting data from {target_directory} to yearly JSONL files...")
-        
+
         yearly_converter = YearlyEnergyDataConverter(output_dir=self.output_dir)
-        
-        conversion_result_files = yearly_converter.convert_to_yearly_jsonl(available_jsonl_files)
-        
+
+        conversion_result_files = yearly_converter.convert_to_yearly_jsonl(
+            available_jsonl_files
+        )
+
         if conversion_result_files:
-            print("\nYearly conversion complete! The data is now available as yearly summaries.")
-            print("These files can be used for year-over-year comparisons and annual reporting.")
-            
+            print(
+                "\nYearly conversion complete! The data is now available as yearly summaries."
+            )
+            print(
+                "These files can be used for year-over-year comparisons and annual reporting."
+            )
+
             total_years_processed = len(conversion_result_files)
-            years_list = [Path(file_path).name.split('_')[0] for file_path in conversion_result_files]
-            
-            print(f"\nSummary files created for {total_years_processed} years: {', '.join(years_list)}")
+            years_list = [
+                Path(file_path).name.split("_")[0]
+                for file_path in conversion_result_files
+            ]
+
+            print(
+                f"\nSummary files created for {total_years_processed} years: {', '.join(years_list)}"
+            )
             print(f"Files saved to: {self.output_dir}")
 
-            convert_to_parquet_requested = self.get_yes_no_input("\nWould you like to convert these yearly files to Parquet format? (y/n): ")
-            
+            convert_to_parquet_requested = self.get_yes_no_input(
+                "\nWould you like to convert these yearly files to Parquet format? (y/n): "
+            )
+
             if convert_to_parquet_requested:
                 print("\nConverting yearly JSONL files to Parquet format...")
                 parquet_converter = JsonlToParquetConverter()
-                successfully_converted_parquet_files = parquet_converter.convert_multiple_jsonl_files(conversion_result_files)
-                
+                successfully_converted_parquet_files = (
+                    parquet_converter.convert_multiple_jsonl_files(
+                        conversion_result_files
+                    )
+                )
+
                 if successfully_converted_parquet_files:
-                    print(f"\nSuccessfully converted {len(successfully_converted_parquet_files)} files to Parquet format:")
+                    print(
+                        f"\nSuccessfully converted {len(successfully_converted_parquet_files)} files to Parquet format:"
+                    )
                     for parquet_file_path in successfully_converted_parquet_files:
                         print(f" - {parquet_file_path}")
-        
+
         return conversion_result_files
 
     def get_directory(self):
@@ -139,7 +184,10 @@ class DataConverterUI(BaseUI):
             custom_directory_path_input = input("\nEnter the directory path: ")
             resolved_custom_directory = Path(custom_directory_path_input)
 
-            if not resolved_custom_directory.exists() or not resolved_custom_directory.is_dir():
+            if (
+                not resolved_custom_directory.exists()
+                or not resolved_custom_directory.is_dir()
+            ):
                 print(f"\nError: {resolved_custom_directory} is not a valid directory.")
                 return None
             return resolved_custom_directory

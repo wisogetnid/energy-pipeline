@@ -1,0 +1,23 @@
+[MASTER]
+ignore=CVS
+
+[MESSAGES CONTROL]
+# C0114: missing-module-docstring
+# C0115: missing-class-docstring
+# C0116: missing-function-docstring
+disable=C0114,
+        C0115,
+        C0116,
+        W1203, # logging-fstring-interpolation (standard in modern python)
+        W0702, # bare-except (sometimes used in this pipeline)
+        W0718, # broad-exception-caught
+        R0913, # too-many-arguments
+        R0914, # too-many-locals
+        R0915, # too-many-statements
+        R0912, # too-many-branches
+        R0917, # too-many-positional-arguments
+        C0415, # import-outside-toplevel
+        W1514, # unspecified-encoding
+
+[FORMAT]
+max-line-length=120
