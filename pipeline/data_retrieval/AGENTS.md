@@ -18,13 +18,19 @@ The `data_retrieval` directory contains modules responsible for fetching energy 
 
 -   **Purpose:** This module provides the `N3rgyCsvClient` class, which is designed to parse and import energy consumption data from CSV files provided by N3rgy.
 -   **Functionality:** It reads the CSV files, extracts the relevant data, and transforms it into a format that is consistent with the rest of the pipeline.
--   **Usage:** The `N3rgyCsvClient` takes a file path to a CSV file as input and returns a structured data object.
+-   **Usage:** The `N3rgyCsvClient` takes a directory of CSV files and processes them.
 
 ### `batch_retrieval.py`
 
 -   **Purpose:** This module contains logic for retrieving data in batches.
--   **Functionality:** It is designed to handle large data requests by breaking them down into smaller, more manageable chunks. This helps to avoid timeouts and other issues that can occur when retrieving a large amount of data at once.
--   **Usage:** The functions in this module can be used in conjunction with the data retrieval clients to fetch data for a long period.
+-   **Functionality:** It handles large data requests by breaking them down into smaller, more manageable chunks.
+-   **Usage:** The `BatchRetriever` class can be used to fetch data for long periods without hitting API limits or timeouts.
+
+### `latest_date_service.py`
+
+-   **Purpose:** Provides a service to detect the latest available local data.
+-   **Functionality:** Scans raw data directories to find the most recent file for each resource and determines a safe starting point ("pivot") for fetching new data.
+-   **Usage:** Used by the UI to implement the "Get latest data" feature.
 
 ## How to Add a New Data Source
 

@@ -28,8 +28,7 @@ The goal is to improve the data retrieval process by adding an automated "Get la
   - **Fallback:** If no files are found, default to a predefined "earliest date" for the provider.
 
 ### 3. Fetch New Data
-- **Glowmarkt Client Integration:** Reuse existing `GlowmarktClient` and associated logic. API communication, batching, and rate limiting are already handled in the codebase and must be leveraged without modification.
-- **n3rgy API Client:** Implement a new `N3rgyAPIClient` to fetch data from the n3rgy consumer API. This will require the user's API Key (Authorization header).
+- **Client Integration:** Reuse existing `GlowmarktClient` and associated logic. API communication, batching, and rate limiting are already handled in the codebase and must be leveraged without modification.
 - **Date Range:** 
   - **Start date:** The start date of the latest existing file (to trigger an overwrite/refresh).
   - **End date:** `today`.
@@ -38,17 +37,15 @@ The goal is to improve the data retrieval process by adding an automated "Get la
 - **Format:** Save data in monthly chunks.
 - **Overwrite Policy:** If a file with the same name already exists (including the "pivot" file identified in step 2), **always overwrite it** with the fresh data from the API.
 - **Naming Convention:** Maintain consistency with existing files (e.g., `electricity_consumption_YYYYMMDD_to_YYYYMMDD.json`).
-- **Location:** 
-  - Glowmarkt: `data/glowmarkt_api_raw`
-  - n3rgy API: `data/n3rgy_raw`
+- **Location:** Write directly to the provider's raw data directory.
 
 ### 5. Integration & Error Handling
 - **User Feedback:** Display the detected last date and the range being fetched.
 - **Error Handling:** If a failure occurs during a multi-month fetch, stop immediately. Inform the user of the error and the last successfully saved file. All data retrieved up to the point of failure must remain saved.
-- **Validation:** Add unit tests for the date detection logic, the new n3rgy client, and the overwrite behavior.
+- **Validation:** Add unit tests for the date detection logic and the overwrite behavior.
 
 ### 6. Documentation & Constraints
-- **n3rgy Provider:** The n3rgy provider will now support both the existing CSV-based flow and a new API-based flow. The "Get latest data" feature will be primarily for the API-based flow.
+- **n3rgy Provider:** Note that the n3rgy provider is file-based and works differently; the "latest data" logic should be scoped primarily to the Glowmarkt API retrieval flow initially, or adapted to n3rgy's specific file-drop structure.
 - Update `AGENTS.md` and CLI help text to reflect the new functionality.
 
 ---
@@ -58,11 +55,9 @@ The goal is to improve the data retrieval process by adding an automated "Get la
 | File Path | Description of Changes |
 | :--- | :--- |
 | `pipeline/data_retrieval/latest_date_service.py` | **(New File)** Implement `get_latest_available_date(data_dir, resources)` to scan raw data folders, parse filenames, and determine the earliest "start-date pivot" across all selected resources. |
-| `pipeline/data_retrieval/n3rgy_api_client.py` | **(New File)** Implement `N3rgyAPIClient` to fetch data from the n3rgy API, supporting authentication and reading retrieval. |
-| `pipeline/ui/data_retrieval_ui.py` | Update `select_time_range()` to add "Get latest data" option. Update `_select_provider()` to include "n3rgy API". Modify `_download_all_resources()` to support fetching data in monthly chunks when the "latest" flag is set. |
-| `pipeline/data_retrieval/batch_retrieval.py` | Enhance or add a wrapper to `get_readings_in_batches` to support grouping results by month to facilitate monthly file saving. Ensure it can work with both Glowmarkt and n3rgy clients. |
+| `pipeline/ui/data_retrieval_ui.py` | Update `select_time_range()` to add "Get latest data" option. Modify `_download_all_resources()` to support fetching data in monthly chunks when the "latest" flag is set. |
+| `pipeline/data_retrieval/batch_retrieval.py` | Enhance or add a wrapper to `get_readings_in_batches` to support grouping results by month to facilitate monthly file saving. |
 | `pipeline/tests/data_retrieval/test_latest_date_service.py` | **(New File)** Unit tests for the date parsing and cross-resource synchronization logic. |
-| `pipeline/tests/data_retrieval/test_n3rgy_api_client.py` | **(New File)** Unit tests for the new n3rgy API client. |
 
 ---
 
@@ -71,5 +66,5 @@ The goal is to improve the data retrieval process by adding an automated "Get la
 - **Overwrite Policy:** Confirmed. We will start from the **start date** of the latest file and overwrite existing files to ensure content completeness.
 - **API Logic:** Confirmed. Reuse existing client implementation for communication and rate limiting.
 - **Failure Mode:** Stop and notify user. Keep data saved up to the failure point.
-- **n3rgy:** Now includes support for the n3rgy consumer API in addition to CSV files.
+- **n3rgy:** Recognized as a different file-based flow.
 - **Retrospective Changes:** Not a priority; "latest data" from API is the source of truth.

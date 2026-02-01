@@ -71,7 +71,7 @@ class DataRetrievalUI(BaseUI):
                 print(f"Authentication failed: {str(e)}")
                 return False
         return True
-    
+
     def setup_n3rgy_client(self, source_dir=None, output_dir=None):
         self.print_header("N3rgy CSV File Setup")
         
@@ -399,6 +399,8 @@ class DataRetrievalUI(BaseUI):
         """Ensure the data directory exists and return its path."""
         if self.client_type == 'glowmarkt':
             data_dir = os.path.join("data", "glowmarkt_api_raw")
+        elif self.client_type == 'n3rgy_api':
+            data_dir = os.path.join("data", "n3rgy_raw")
         else:
             data_dir = os.path.join("data", "n3rgy_processed")
 

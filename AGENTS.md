@@ -21,7 +21,6 @@ This project is a Python-based data pipeline for retrieving, processing, and vis
 
 Currently supported data sources are
 - Hildebrand Glowmarkt API
-- n3rgy consumer API
 - n3rgy (personal) data in .csv/.json format
 
 ## High-Level Architecture
