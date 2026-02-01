@@ -485,3 +485,96 @@ class TestYearlyEnergyDataConverter:
             assert (
                 abs(actual_consumption_total - expected_consumption_total) < 0.01
             ), f"Idempotency bug! Expected {expected_consumption_total}, got {actual_consumption_total}"
+
+    def test_resource_specific_aggregation(self, tmp_path):
+        converter_output_dir = tmp_path / "output"
+        converter_output_dir.mkdir()
+        converter = YearlyEnergyDataConverter(output_dir=str(converter_output_dir))
+
+        input_file = tmp_path / "combined_data.jsonl"
+        with open(input_file, "w") as f:
+            # Day 1: Gas = 10, Electricity = 5
+            f.write(json.dumps({
+                "timestamp": 1738368000,  # 2025-02-01
+                "gas_consumption": 10.0,
+                "electricity_consumption": 5.0,
+                "gas_cost": 1.0,
+                "electricity_cost": 0.5,
+                "gas_consumption_unit": "kWh",
+                "electricity_consumption_unit": "kWh"
+            }) + "\n")
+            # Day 2: Gas = 20, Electricity = 15
+            f.write(json.dumps({
+                "timestamp": 1738454400,  # 2025-02-02
+                "gas_consumption": 20.0,
+                "electricity_consumption": 15.0,
+                "gas_cost": 2.0,
+                "electricity_cost": 1.5,
+                "gas_consumption_unit": "kWh",
+                "electricity_consumption_unit": "kWh"
+            }) + "\n")
+
+        converter.convert_to_yearly_jsonl([str(input_file)])
+
+        output_2025 = converter_output_dir / "2025_annual_energy_summary.jsonl"
+        with open(output_2025, "r") as f:
+            lines = f.readlines()
+
+            yearly_summary = next(json.loads(line) for line in lines if json.loads(line).get("data_type") == "yearly_summary")
+            monthly_summary = next(json.loads(line) for line in lines if json.loads(line).get("data_type") == "monthly_summary")
+
+            # Yearly totals (10+20=30, 5+15=20)
+            assert abs(yearly_summary["gas_consumption_total"] - 30.0) < 0.0001
+            assert abs(yearly_summary["electricity_consumption_total"] - 20.0) < 0.0001
+            assert abs(yearly_summary["gas_cost_total"] - 3.0) < 0.0001
+            assert abs(yearly_summary["electricity_cost_total"] - 2.0) < 0.0001
+
+            # Monthly totals
+            assert abs(monthly_summary["gas_consumption_total"] - 30.0) < 0.0001
+            assert abs(monthly_summary["electricity_consumption_total"] - 20.0) < 0.0001
+            assert abs(monthly_summary["gas_cost_total"] - 3.0) < 0.0001
+            assert abs(monthly_summary["electricity_cost_total"] - 2.0) < 0.0001
+
+    def test_resource_file_pair_aggregation(self, tmp_path):
+        converter_output_dir = tmp_path / "output"
+        converter_output_dir.mkdir()
+        converter = YearlyEnergyDataConverter(output_dir=str(converter_output_dir))
+
+        # Gas consumption: Day 1 = 10, Day 2 = 20
+        gas_consumption = {
+            "resource_id": "gas-id",
+            "resource_name": "gas consumption",
+            "resource_unit": "kWh",
+            "readings": [[1738368000, 10.0], [1738454400, 20.0]]
+        }
+        # Gas cost: Day 1 = 1, Day 2 = 2
+        gas_cost = {
+            "resource_id": "gas-id",
+            "resource_name": "gas cost",
+            "resource_unit": "pence",
+            "readings": [[1738368000, 1.0], [1738454400, 2.0]]
+        }
+
+        gas_cons_file = tmp_path / "gas_consumption_20250201_to_20250202.json"
+        gas_cost_file = tmp_path / "gas_cost_20250201_to_20250202.json"
+
+        with open(gas_cons_file, "w") as f:
+            json.dump(gas_consumption, f)
+        with open(gas_cost_file, "w") as f:
+            json.dump(gas_cost, f)
+
+        converter.convert_to_yearly_jsonl([(str(gas_cons_file), str(gas_cost_file))])
+
+        output_2025 = converter_output_dir / "2025_annual_energy_summary.jsonl"
+        with open(output_2025, "r") as f:
+            lines = f.readlines()
+            yearly_summary = json.loads(lines[0])
+            monthly_summary = json.loads(lines[1])
+            
+            # Yearly gas total should be 30
+            assert abs(yearly_summary["gas_consumption_total"] - 30.0) < 0.0001
+            assert abs(yearly_summary["gas_cost_total"] - 3.0) < 0.0001
+            
+            # Monthly gas total should be 30
+            assert abs(monthly_summary["gas_consumption_total"] - 30.0) < 0.0001
+            assert abs(monthly_summary["gas_cost_total"] - 3.0) < 0.0001

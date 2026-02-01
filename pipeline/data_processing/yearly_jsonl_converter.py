@@ -73,20 +73,28 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
 
             resource_types = ["electricity", "gas", "water"]
             for resource in resource_types:
+                consumption_key = f"{resource}_consumption"
+                cost_key = f"{resource}_cost"
+
                 if (
-                    f"{resource}_consumption" in reading
-                    and reading[f"{resource}_consumption"] is not None
+                    consumption_key in reading
+                    and reading[consumption_key] is not None
                 ):
                     if consumption is None:
                         consumption = 0
-                    consumption += reading[f"{resource}_consumption"]
-                if (
-                    f"{resource}_cost" in reading
-                    and reading[f"{resource}_cost"] is not None
-                ):
+                    consumption += reading[consumption_key]
+                    daily_data[day][consumption_key] = (
+                        daily_data[day].get(consumption_key, 0)
+                        + reading[consumption_key]
+                    )
+
+                if cost_key in reading and reading[cost_key] is not None:
                     if cost is None:
                         cost = 0
-                    cost += reading[f"{resource}_cost"]
+                    cost += reading[cost_key]
+                    daily_data[day][cost_key] = (
+                        daily_data[day].get(cost_key, 0) + reading[cost_key]
+                    )
 
             if consumption is not None:
                 daily_data[day]["consumption_value"] += consumption
@@ -407,12 +415,22 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                             }
 
                         for k, v in data.items():
-                            if k in [
-                                "consumption_value",
-                                "cost_value",
-                                "count",
-                            ] and isinstance(v, (int, float)):
-                                yearly_data_combined[year][day][k] += v
+                            if isinstance(v, (int, float)) and (
+                                k
+                                in [
+                                    "consumption_value",
+                                    "cost_value",
+                                    "count",
+                                    "consumption_total",
+                                    "cost_total",
+                                    "reading_count",
+                                ]
+                                or k.endswith("_consumption")
+                                or k.endswith("_cost")
+                            ):
+                                yearly_data_combined[year][day][k] = (
+                                    yearly_data_combined[year][day].get(k, 0) + v
+                                )
                             elif k not in yearly_data_combined[year][day]:
                                 yearly_data_combined[year][day][k] = v
             elif file_path.suffix.lower() == ".json":
@@ -427,6 +445,16 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                     resource_type = resource_metadata.get("resource_type", "unknown")
                     if resource_type != "unknown":
                         self.resource_metadata[resource_type] = resource_metadata
+                        # Add resource-specific keys if they don't exist
+                        for day, values in daily_data.items():
+                            if f"{resource_type}_consumption" not in values:
+                                values[f"{resource_type}_consumption"] = values.get(
+                                    "consumption_value", 0
+                                )
+                            if f"{resource_type}_cost" not in values:
+                                values[f"{resource_type}_cost"] = values.get(
+                                    "cost_value", 0
+                                )
                     for day, values in daily_data.items():
                         year = day.split("-")[0]
                         if day not in yearly_data_combined[year]:
@@ -437,12 +465,22 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                             }
 
                         for k, v in values.items():
-                            if k in [
-                                "consumption_value",
-                                "cost_value",
-                                "count",
-                            ] and isinstance(v, (int, float)):
-                                yearly_data_combined[year][day][k] += v
+                            if isinstance(v, (int, float)) and (
+                                k
+                                in [
+                                    "consumption_value",
+                                    "cost_value",
+                                    "count",
+                                    "consumption_total",
+                                    "cost_total",
+                                    "reading_count",
+                                ]
+                                or k.endswith("_consumption")
+                                or k.endswith("_cost")
+                            ):
+                                yearly_data_combined[year][day][k] = (
+                                    yearly_data_combined[year][day].get(k, 0) + v
+                                )
                             elif k not in yearly_data_combined[year][day]:
                                 yearly_data_combined[year][day][k] = v
 
@@ -471,12 +509,22 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                             }
 
                         for k, v in data.items():
-                            if k in [
-                                "consumption_value",
-                                "cost_value",
-                                "count",
-                            ] and isinstance(v, (int, float)):
-                                yearly_data_combined[year_key][day][k] += v
+                            if isinstance(v, (int, float)) and (
+                                k
+                                in [
+                                    "consumption_value",
+                                    "cost_value",
+                                    "count",
+                                    "consumption_total",
+                                    "cost_total",
+                                    "reading_count",
+                                ]
+                                or k.endswith("_consumption")
+                                or k.endswith("_cost")
+                            ):
+                                yearly_data_combined[year_key][day][k] = (
+                                    yearly_data_combined[year_key][day].get(k, 0) + v
+                                )
                             elif k not in yearly_data_combined[year_key][day]:
                                 yearly_data_combined[year_key][day][k] = v
             else:
@@ -508,10 +556,20 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                     }
 
                 for k, v in data.items():
-                    if k in ["consumption_value", "cost_value", "count"] and isinstance(
-                        v, (int, float)
+                    if isinstance(v, (int, float)) and (
+                        k
+                        in [
+                            "consumption_value",
+                            "cost_value",
+                            "count",
+                            "consumption_total",
+                            "cost_total",
+                            "reading_count",
+                        ]
+                        or k.endswith("_consumption")
+                        or k.endswith("_cost")
                     ):
-                        monthly_data[month][k] += v
+                        monthly_data[month][k] = monthly_data[month].get(k, 0) + v
                     elif k not in monthly_data[month]:
                         monthly_data[month][k] = v
             with open(output_file, "w") as f:
