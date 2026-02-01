@@ -422,42 +422,8 @@ class TestEnergyDataConverter:
 
             json.dump(gas_cost_data, f)
 
-        output_file = converter.combine_all_resources_into_single_file(
-            test_data_dir, split_by_month=False
-        )
-
-        assert output_file is not None
-        assert Path(output_file).exists()
-
-        with open(output_file, "r") as f:
-            jsonl_lines = f.read().strip().split("\n")
-
-        assert len(jsonl_lines) > 0
-
-        first_entry = json.loads(jsonl_lines[0])
-
-        assert "electricity_consumption" in first_entry
-        assert "electricity_cost" in first_entry
-        assert "gas_consumption" in first_entry
-        assert "gas_cost" in first_entry
-
-        assert "electricity_consumption_id" in first_entry
-        assert "electricity_cost_id" in first_entry
-        assert "gas_consumption_id" in first_entry
-        assert "gas_cost_id" in first_entry
-
-        assert "timestamp" in first_entry
-
-        assert (
-            first_entry["electricity_consumption_id"]
-            == "04678775-6c72-43c9-8378-c9914756384a"
-        )
-        assert (
-            first_entry["gas_consumption_id"] == "20cb0793-1adb-4d7f-92f4-fa30ddbf1f35"
-        )
-
-        output_files = converter.combine_all_resources_into_single_file(
-            test_data_dir, split_by_month=True
+        output_files = converter.combine_all_resources(
+            test_data_dir
         )
 
         assert output_files is not None

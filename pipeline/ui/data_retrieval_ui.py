@@ -787,82 +787,29 @@ class DataRetrievalUI(BaseUI):
             for filepath in retrieved_files:
                 print(f"- {Path(filepath).name}")
 
-            print("\nHow would you like to combine these resources?")
-            print("1. Create a single combined file for all data")
-            print("2. Create separate combined files for each month")
-
-            choice = self.get_int_input("\nSelect an option: ", 1, 2)
-            split_by_month = choice == 2
-
-            print("\nCombining resources into a single file...")
+            print("\nCombining resources into monthly JSONL files...")
             from pipeline.data_processing.jsonl_converter import EnergyDataConverter
 
             output_dir = Path("data/processed")
 
             converter = EnergyDataConverter(output_dir=output_dir)
-            combined_filepath = converter.combine_all_resources_into_single_file(
-                temp_dir, split_by_month=split_by_month
+            combined_filepath = converter.combine_all_resources(
+                temp_dir
             )
 
             if combined_filepath:
-                if isinstance(combined_filepath, list):
-                    print(
-                        f"\nAll resources successfully combined into {len(combined_filepath)} monthly files:"
-                    )
-                    for filepath in combined_filepath:
-                        print(f"- {filepath}")
+                print(
+                    f"\nAll resources successfully combined into {len(combined_filepath)} monthly files:"
+                )
+                for filepath in combined_filepath:
+                    print(f"- {filepath}")
 
-                    convert_to_parquet = self.get_yes_no_input(
-                        "Convert to Parquet? (y/n): "
-                    )
+                convert_to_parquet = self.get_yes_no_input(
+                    "Convert to Parquet? (y/n): "
+                )
 
-                    if convert_to_parquet:
-                        from pipeline.data_processing.parquet_converter import (
-                            JsonlToParquetConverter,
-                        )
-
-                        parquet_dir = Path("data/parquet")
-                        parquet_converter = JsonlToParquetConverter(
-                            output_dir=str(parquet_dir)
-                        )
-
-                        parquet_filepaths = []
-                        for jsonl_file in combined_filepath:
-                            print(f"\nConverting {Path(jsonl_file).name} to Parquet...")
-                            parquet_filepath = (
-                                parquet_converter.convert_jsonl_to_parquet_file(
-                                    jsonl_file
-                                )
-                            )
-                            if parquet_filepath:
-                                parquet_filepaths.append(parquet_filepath)
-
-                        if parquet_filepaths:
-                            print(
-                                f"\nSuccessfully converted {len(parquet_filepaths)} files to Parquet format:"
-                            )
-                            for filepath in parquet_filepaths:
-                                print(f"- {filepath}")
-
-                    original_paths = []
-                    data_dir = self._get_data_directory()
-                    for temp_path in retrieved_files:
-                        filename = Path(temp_path).name
-                        original_path = os.path.join(data_dir, filename)
-                        original_paths.append(original_path)
-
-                    import shutil
-
-                    shutil.rmtree(temp_dir)
-                    print(f"\nTemporary directory removed: {temp_dir}")
-
-                    return [*combined_filepath, *original_paths]
-                else:
-                    print(
-                        f"\nAll resources successfully combined into a single file: {combined_filepath}"
-                    )
-
-                    print("\nConverting combined file to Parquet format...")
+                parquet_filepaths = []
+                if convert_to_parquet:
                     from pipeline.data_processing.parquet_converter import (
                         JsonlToParquetConverter,
                     )
@@ -871,35 +818,37 @@ class DataRetrievalUI(BaseUI):
                     parquet_converter = JsonlToParquetConverter(
                         output_dir=str(parquet_dir)
                     )
-                    parquet_filepath = parquet_converter.convert_jsonl_to_parquet_file(
-                        combined_filepath
-                    )
 
-                    if parquet_filepath:
-                        print(
-                            f"\nSuccessfully converted to Parquet format: {parquet_filepath}"
+                    for jsonl_file in combined_filepath:
+                        print(f"\nConverting {Path(jsonl_file).name} to Parquet...")
+                        parquet_filepath = (
+                            parquet_converter.convert_jsonl_to_parquet_file(
+                                jsonl_file
+                            )
                         )
+                        if parquet_filepath:
+                            parquet_filepaths.append(parquet_filepath)
 
-                        original_paths = []
-                        data_dir = self._get_data_directory()
-                        for temp_path in retrieved_files:
-                            filename = Path(temp_path).name
-                            original_path = os.path.join(data_dir, filename)
-                            original_paths.append(original_path)
+                    if parquet_filepaths:
+                        print(
+                            f"\nSuccessfully converted {len(parquet_filepaths)} files to Parquet format:"
+                        )
+                        for filepath in parquet_filepaths:
+                            print(f"- {filepath}")
 
-                        import shutil
+                original_paths = []
+                data_dir = self._get_data_directory()
+                for temp_path in retrieved_files:
+                    filename = Path(temp_path).name
+                    original_path = os.path.join(data_dir, filename)
+                    original_paths.append(original_path)
 
-                        shutil.rmtree(temp_dir)
-                        print(f"\nTemporary directory removed: {temp_dir}")
+                import shutil
 
-                        return [parquet_filepath, combined_filepath, *original_paths]
-                    else:
-                        import shutil
+                shutil.rmtree(temp_dir)
+                print(f"\nTemporary directory removed: {temp_dir}")
 
-                        shutil.rmtree(temp_dir)
-                        print(f"\nTemporary directory removed: {temp_dir}")
-
-                        return [combined_filepath]
+                return [*combined_filepath, *parquet_filepaths, *original_paths]
             else:
                 import shutil
 

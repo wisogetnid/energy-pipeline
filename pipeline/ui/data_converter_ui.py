@@ -18,7 +18,7 @@ class DataConverterUI(BaseUI):
             target_data_directory = Path(directory) if directory else self.data_dir
 
             combined_jsonl_filepath = (
-                energy_data_converter.combine_all_resources_into_single_file(
+                energy_data_converter.combine_all_resources(
                     target_data_directory
                 )
             )
@@ -30,8 +30,10 @@ class DataConverterUI(BaseUI):
                 return None
 
             print(
-                f"\nAll resources successfully combined into JSONL format: {combined_jsonl_filepath}"
+                f"\nAll resources successfully combined into monthly JSONL files."
             )
+            for file_path in combined_jsonl_filepath:
+                print(f" - {file_path}")
             print(
                 "Each line contains data for all resource types (electricity, gas, etc.) for the same timestamp."
             )
@@ -74,7 +76,7 @@ class DataConverterUI(BaseUI):
         self.print_header("Data Converter")
 
         converter_menu_options = {
-            "1": "Combine all resources into a single JSONL file",
+            "1": "Combine all resources into monthly JSONL files",
             "2": "Convert Monthly to Yearly (JSONL & Parquet)",
             "3": "Exit",
         }
@@ -94,7 +96,7 @@ class DataConverterUI(BaseUI):
         selected_directory = self.get_directory()
         if selected_directory:
             print(
-                f"\nCombining ALL resources from {selected_directory} into a single file..."
+                f"\nCombining ALL resources from {selected_directory} into monthly files..."
             )
             self.combine_all_resources(selected_directory)
 

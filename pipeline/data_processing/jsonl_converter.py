@@ -286,18 +286,17 @@ class EnergyDataConverter:
         )
         return matching_file_pairs_list
 
-    def combine_all_resources_into_single_file(
+    def combine_all_resources(
         self,
         directory: Union[str, Path] = "data/glowmarkt_api_raw",
         output_file: Optional[Union[str, Path]] = None,
-        split_by_month: bool = True,
-    ) -> Union[str, List[str]]:
+    ) -> List[str]:
         directory_path = Path(directory)
         matching_file_pairs_list = self.find_matching_resource_files(directory_path)
 
         if not matching_file_pairs_list:
             logger.warning(f"No matching consumption-cost pairs found in {directory}")
-            return None
+            return []
 
         combined_readings_map = {}
         metadata_by_resource_type = {}
@@ -353,55 +352,6 @@ class EnergyDataConverter:
             consolidated_global_metadata[f"{res_type}_cost_classifier"] = metadata[
                 "cost_classifier"
             ]
-
-        if not split_by_month:
-            if output_file is None:
-                representative_consumption_file = matching_file_pairs_list[0][0]
-                representative_data = self.load_json_from_file(
-                    representative_consumption_file
-                )
-
-                raw_from_date = representative_data.get("query", {}).get(
-                    "from", representative_data.get("start_date", "unknown")
-                )
-                raw_to_date = representative_data.get("query", {}).get(
-                    "to", representative_data.get("end_date", "unknown")
-                )
-
-                start_date_suffix = (
-                    raw_from_date.split("T")[0].replace("-", "")
-                    if isinstance(raw_from_date, str)
-                    else "unknown"
-                )
-                end_date_suffix = (
-                    raw_to_date.split("T")[0].replace("-", "")
-                    if isinstance(raw_to_date, str)
-                    else "unknown"
-                )
-
-                output_jsonl_filename = (
-                    f"all_resources_{start_date_suffix}_to_{end_date_suffix}.jsonl"
-                )
-                output_jsonl_path = self.output_dir / output_jsonl_filename
-            else:
-                output_jsonl_path = Path(output_file)
-
-            output_jsonl_path.parent.mkdir(parents=True, exist_ok=True)
-
-            entries_written_count = 0
-            with open(output_jsonl_path, "w") as file_handle:
-                for timestamp, reading_data in sorted(combined_readings_map.items()):
-                    fully_combined_record = {
-                        **consolidated_global_metadata,
-                        **reading_data,
-                    }
-                    file_handle.write(json.dumps(fully_combined_record) + "\n")
-                    entries_written_count += 1
-
-            logger.info(
-                f"Combined {entries_written_count} readings across {len(metadata_by_resource_type)} resource types into JSONL format at {output_jsonl_path}"
-            )
-            return str(output_jsonl_path)
 
         monthly_binned_readings = {}
         output_files_paths = []
