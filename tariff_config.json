@@ -12,14 +12,14 @@
     },
     "comparison_plans": [
         {
-            "name": "British",
+            "name": "Outfox Family",
             "electricity": {
-                "standing_charge_pence_per_day": 47.833,
-                "unit_rate_pence_per_kwh": 22.416
+                "standing_charge_pence_per_day": 49.704,
+                "unit_rate_pence_per_kwh": 21.35
             },
             "gas": {
-                "standing_charge_pence_per_day": 21.718,
-                "unit_rate_pence_per_kwh": 6.401
+                "standing_charge_pence_per_day": 58.47,
+                "unit_rate_pence_per_kwh": 5.45
             }
         },
         {

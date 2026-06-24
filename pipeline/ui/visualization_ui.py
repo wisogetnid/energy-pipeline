@@ -672,12 +672,14 @@ class VisualizationUI(BaseUI):
         gas_unit = self.get_float_input("Gas unit rate (pence per kWh): ")
         current_tariff_costs = {"electricity": [], "gas": []}
         theoretical_costs = {"electricity": [], "gas": []}
+        total_consumption = {"electricity": 0.0, "gas": 0.0}
         xlabels = []
         for year, month, resource_consumptions, resource_costs in last_12:
             label = f"{year}-{month:02d}"
             xlabels.append(label)
             for resource in ["electricity", "gas"]:
                 consumption = resource_consumptions.get(resource, 0)
+                total_consumption[resource] += consumption
                 days_in_month = calendar.monthrange(year, month)[1]
                 if resource == "electricity":
                     theo = (consumption * elec_unit) + (elec_standing * days_in_month)
@@ -784,6 +786,10 @@ class VisualizationUI(BaseUI):
         plt.savefig(outpath)
         plt.close()
         print(f"\nComparison chart saved to: {outpath}")
+
+        print("\nYearly Total Consumption (Last 12 Months):")
+        print(f"  Electricity: {total_consumption['electricity']:.2f} kWh")
+        print(f"  Gas: {total_consumption['gas']:.2f} kWh")
 
         print("\nYearly Total Cost Summary (Last 12 Months):")
 
@@ -958,12 +964,14 @@ class VisualizationUI(BaseUI):
             return False
 
         current_tariff_costs = {"electricity": [], "gas": []}
+        total_consumption = {"electricity": 0.0, "gas": 0.0}
         xlabels = []
         for year, month, resource_consumptions, resource_costs in last_12:
             label = f"{year}-{month:02d}"
             xlabels.append(label)
             for resource in ["electricity", "gas"]:
                 consumption = resource_consumptions.get(resource, 0)
+                total_consumption[resource] += consumption
                 days_in_month = calendar.monthrange(year, month)[1]
                 if resource == "electricity":
                     curr = (
@@ -1089,6 +1097,10 @@ class VisualizationUI(BaseUI):
         plt.savefig(outpath)
         plt.close()
         print(f"\nComparison chart saved to: {outpath}")
+
+        print("\nYearly Total Consumption (Last 12 Months):")
+        print(f"  Electricity: {total_consumption['electricity']:.2f} kWh")
+        print(f"  Gas: {total_consumption['gas']:.2f} kWh")
 
         print("\nYearly Total Cost Summary (Last 12 Months):")
 
