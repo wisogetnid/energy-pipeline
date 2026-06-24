@@ -670,7 +670,6 @@ class VisualizationUI(BaseUI):
         elec_unit = self.get_float_input("Electricity unit rate (pence per kWh): ")
         gas_standing = self.get_float_input("Gas standing charge (pence per day): ")
         gas_unit = self.get_float_input("Gas unit rate (pence per kWh): ")
-        actual_costs = {"electricity": [], "gas": []}
         current_tariff_costs = {"electricity": [], "gas": []}
         theoretical_costs = {"electricity": [], "gas": []}
         xlabels = []
@@ -679,7 +678,6 @@ class VisualizationUI(BaseUI):
             xlabels.append(label)
             for resource in ["electricity", "gas"]:
                 consumption = resource_consumptions.get(resource, 0)
-                actual = resource_costs.get(resource, 0)
                 days_in_month = calendar.monthrange(year, month)[1]
                 if resource == "electricity":
                     theo = (consumption * elec_unit) + (elec_standing * days_in_month)
@@ -707,7 +705,6 @@ class VisualizationUI(BaseUI):
                         )
                         * days_in_month
                     )
-                actual_costs[resource].append(actual)
                 current_tariff_costs[resource].append(curr)
                 theoretical_costs[resource].append(theo)
         import matplotlib.pyplot as plt
@@ -715,13 +712,6 @@ class VisualizationUI(BaseUI):
         plt.figure(figsize=(15, 8))
         x = range(12)
         for resource, color in zip(["electricity", "gas"], ["tab:blue", "tab:orange"]):
-            plt.plot(
-                x,
-                actual_costs[resource],
-                marker="o",
-                label=f"Actual {resource.capitalize()} Cost (API)",
-                color=color,
-            )
             plt.plot(
                 x,
                 current_tariff_costs[resource],
@@ -742,8 +732,8 @@ class VisualizationUI(BaseUI):
             )
             for i in x:
                 plt.annotate(
-                    f"{actual_costs[resource][i]:.2f}",
-                    (i, actual_costs[resource][i]),
+                    f"{current_tariff_costs[resource][i]:.2f}",
+                    (i, current_tariff_costs[resource][i]),
                     textcoords="offset points",
                     xytext=(0, 6),
                     ha="center",
@@ -796,13 +786,6 @@ class VisualizationUI(BaseUI):
         print(f"\nComparison chart saved to: {outpath}")
 
         print("\nYearly Total Cost Summary (Last 12 Months):")
-        actual_elec_total = sum(actual_costs["electricity"]) / 100
-        actual_gas_total = sum(actual_costs["gas"]) / 100
-        actual_total = actual_elec_total + actual_gas_total
-        print(f"Actual (API):")
-        print(f"  Electricity: £{actual_elec_total:.2f}")
-        print(f"  Gas: £{actual_gas_total:.2f}")
-        print(f"  Total: £{actual_total:.2f}")
 
         curr_elec_total = sum(current_tariff_costs["electricity"]) / 100
         curr_gas_total = sum(current_tariff_costs["gas"]) / 100
@@ -974,7 +957,6 @@ class VisualizationUI(BaseUI):
             print("\nNo comparison plans available. Please add at least one plan.")
             return False
 
-        actual_costs = {"electricity": [], "gas": []}
         current_tariff_costs = {"electricity": [], "gas": []}
         xlabels = []
         for year, month, resource_consumptions, resource_costs in last_12:
@@ -982,8 +964,6 @@ class VisualizationUI(BaseUI):
             xlabels.append(label)
             for resource in ["electricity", "gas"]:
                 consumption = resource_consumptions.get(resource, 0)
-                actual = resource_costs.get(resource, 0)
-                actual_costs[resource].append(actual)
                 days_in_month = calendar.monthrange(year, month)[1]
                 if resource == "electricity":
                     curr = (
@@ -1035,13 +1015,6 @@ class VisualizationUI(BaseUI):
         for resource, color in zip(["electricity", "gas"], ["tab:blue", "tab:orange"]):
             plt.plot(
                 x,
-                actual_costs[resource],
-                marker="o",
-                label=f"Actual {resource.capitalize()} Cost (API)",
-                color=color,
-            )
-            plt.plot(
-                x,
                 current_tariff_costs[resource],
                 marker="s",
                 linestyle="-.",
@@ -1051,8 +1024,8 @@ class VisualizationUI(BaseUI):
             )
             for i in x:
                 plt.annotate(
-                    f"{actual_costs[resource][i]:.2f}",
-                    (i, actual_costs[resource][i]),
+                    f"{current_tariff_costs[resource][i]:.2f}",
+                    (i, current_tariff_costs[resource][i]),
                     textcoords="offset points",
                     xytext=(0, 6),
                     ha="center",
@@ -1118,13 +1091,6 @@ class VisualizationUI(BaseUI):
         print(f"\nComparison chart saved to: {outpath}")
 
         print("\nYearly Total Cost Summary (Last 12 Months):")
-        actual_elec_total = sum(actual_costs["electricity"]) / 100
-        actual_gas_total = sum(actual_costs["gas"]) / 100
-        actual_total = actual_elec_total + actual_gas_total
-        print(f"Actual (API):")
-        print(f"  Electricity: £{actual_elec_total:.2f}")
-        print(f"  Gas: £{actual_gas_total:.2f}")
-        print(f"  Total: £{actual_total:.2f}")
 
         curr_elec_total = sum(current_tariff_costs["electricity"]) / 100
         curr_gas_total = sum(current_tariff_costs["gas"]) / 100
