@@ -1,13 +1,26 @@
 {
     "current_plan": {
-        "name": "My Current Tariff",
+        "name": "Ecotricity",
         "electricity": {
-            "standing_charge_pence_per_day": 45.0,
-            "unit_rate_pence_per_kwh": 24.5
+            "standing_charge_pence_per_day": 50.36,
+            "unit_rate_pence_per_kwh": 20.81
         },
         "gas": {
-            "standing_charge_pence_per_day": 29.6,
-            "unit_rate_pence_per_kwh": 6.0
+            "standing_charge_pence_per_day": 45.46,
+            "unit_rate_pence_per_kwh": 5.03
         }
-    }
+    },
+    "comparison_plans": [
+        {
+            "name": "Example Comparison Plan",
+            "electricity": {
+                "standing_charge_pence_per_day": 40.0,
+                "unit_rate_pence_per_kwh": 22.0
+            },
+            "gas": {
+                "standing_charge_pence_per_day": 28.0,
+                "unit_rate_pence_per_kwh": 5.5
+            }
+        }
+    ]
 }

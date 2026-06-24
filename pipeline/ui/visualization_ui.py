@@ -585,7 +585,7 @@ class VisualizationUI(BaseUI):
         print(f"- Resource Cost (stacked): {costStackedPath}")
         print(f"- Cost (line): {costPath}")
 
-    def get_current_tariff_config(self):
+    def get_tariff_config(self):
         config_path = Path("tariff_config.json")
         if not config_path.exists():
             default_config = {
@@ -599,19 +599,31 @@ class VisualizationUI(BaseUI):
                         "standing_charge_pence_per_day": 0.0,
                         "unit_rate_pence_per_kwh": 0.0,
                     },
-                }
+                },
+                "comparison_plans": [
+                    {
+                        "name": "Example Comparison Plan",
+                        "electricity": {
+                            "standing_charge_pence_per_day": 0.0,
+                            "unit_rate_pence_per_kwh": 0.0,
+                        },
+                        "gas": {
+                            "standing_charge_pence_per_day": 0.0,
+                            "unit_rate_pence_per_kwh": 0.0,
+                        },
+                    }
+                ],
             }
             with open(config_path, "w") as f:
                 json.dump(default_config, f, indent=4)
             print(f"\nCreated default tariff configuration file at {config_path}.")
             print(
-                "Please update it with your actual current rates for an accurate baseline."
+                "Please update it with your actual current rates and comparison plans."
             )
-            return default_config["current_plan"]
+            return default_config
 
         with open(config_path, "r") as f:
-            config = json.load(f)
-            return config.get("current_plan", {})
+            return json.load(f)
 
     def compare_theoretical_costs_cli(self):
         import calendar
@@ -649,7 +661,8 @@ class VisualizationUI(BaseUI):
             return False
         month_entries.sort()
         last_12 = month_entries[-12:]
-        current_tariff = self.get_current_tariff_config()
+        config = self.get_tariff_config()
+        current_tariff = config.get("current_plan", {})
         print("\nEnter new rates:")
         elec_standing = self.get_float_input(
             "Electricity standing charge (pence per day): "
@@ -844,33 +857,123 @@ class VisualizationUI(BaseUI):
             return False
         month_entries.sort()
         last_12 = month_entries[-12:]
-        current_tariff = self.get_current_tariff_config()
-        num_plans = self.get_int_input(
-            "How many energy plans do you want to compare? (1-5): ", 1, 5
+        config = self.get_tariff_config()
+        current_tariff = config.get("current_plan", {})
+        comparison_plans_config = config.get("comparison_plans", [])
+
+        print("\n" + "=" * 50)
+        print("Current Tariff Configuration:")
+        print(f"  Name: {current_tariff.get('name', 'Unnamed')}")
+        print(
+            f"  Elec: {current_tariff.get('electricity', {}).get('standing_charge_pence_per_day', 0)}p/d, {current_tariff.get('electricity', {}).get('unit_rate_pence_per_kwh', 0)}p/kWh"
         )
+        print(
+            f"  Gas:  {current_tariff.get('gas', {}).get('standing_charge_pence_per_day', 0)}p/d, {current_tariff.get('gas', {}).get('unit_rate_pence_per_kwh', 0)}p/kWh"
+        )
+
+        print("\nComparison Plans in Config:")
+        if not comparison_plans_config:
+            print("  (None)")
+        else:
+            for idx, p in enumerate(comparison_plans_config, 1):
+                print(f"  {idx}. {p.get('name', 'Unnamed')}")
+                print(
+                    f"     Elec: {p.get('electricity', {}).get('standing_charge_pence_per_day', 0)}p/d, {p.get('electricity', {}).get('unit_rate_pence_per_kwh', 0)}p/kWh"
+                )
+                print(
+                    f"     Gas:  {p.get('gas', {}).get('standing_charge_pence_per_day', 0)}p/d, {p.get('gas', {}).get('unit_rate_pence_per_kwh', 0)}p/kWh"
+                )
+        print("=" * 50)
+
+        print("\nOptions:")
+        print("1. Calculate using only the plans from the config")
+        print("2. Add more plans to compare (and optionally save to config)")
+        print("3. Cancel")
+
+        choice = self.get_int_input("\nEnter choice (1-3): ", 1, 3)
+        if choice == 3:
+            return False
+
         plans = []
-        for i in range(num_plans):
-            print(f"\nEnter rates for plan {i+1}:")
-            plan_name = input("Plan name: ") or f"Plan {i+1}"
-            elec_standing = self.get_float_input(
-                "  Electricity standing charge (pence per day): "
-            )
-            elec_unit = self.get_float_input(
-                "  Electricity unit rate (pence per kWh): "
-            )
-            gas_standing = self.get_float_input(
-                "  Gas standing charge (pence per day): "
-            )
-            gas_unit = self.get_float_input("  Gas unit rate (pence per kWh): ")
+        for p in comparison_plans_config:
             plans.append(
                 {
-                    "name": plan_name,
-                    "elec_standing": elec_standing,
-                    "elec_unit": elec_unit,
-                    "gas_standing": gas_standing,
-                    "gas_unit": gas_unit,
+                    "name": p.get("name", "Unnamed Plan"),
+                    "elec_standing": p.get("electricity", {}).get(
+                        "standing_charge_pence_per_day", 0.0
+                    ),
+                    "elec_unit": p.get("electricity", {}).get(
+                        "unit_rate_pence_per_kwh", 0.0
+                    ),
+                    "gas_standing": p.get("gas", {}).get(
+                        "standing_charge_pence_per_day", 0.0
+                    ),
+                    "gas_unit": p.get("gas", {}).get("unit_rate_pence_per_kwh", 0.0),
                 }
             )
+
+        if choice == 2:
+            num_new = self.get_int_input(
+                "How many additional plans do you want to add? (1-5): ", 1, 5
+            )
+            new_plans_config_format = []
+            for i in range(num_new):
+                print(f"\nEnter rates for new plan {i+1}:")
+                plan_name = input("Plan name: ") or f"New Plan {i+1}"
+                elec_standing = self.get_float_input(
+                    "  Electricity standing charge (pence per day): "
+                )
+                elec_unit = self.get_float_input(
+                    "  Electricity unit rate (pence per kWh): "
+                )
+                gas_standing = self.get_float_input(
+                    "  Gas standing charge (pence per day): "
+                )
+                gas_unit = self.get_float_input("  Gas unit rate (pence per kWh): ")
+
+                plans.append(
+                    {
+                        "name": plan_name,
+                        "elec_standing": elec_standing,
+                        "elec_unit": elec_unit,
+                        "gas_standing": gas_standing,
+                        "gas_unit": gas_unit,
+                    }
+                )
+
+                new_plans_config_format.append(
+                    {
+                        "name": plan_name,
+                        "electricity": {
+                            "standing_charge_pence_per_day": elec_standing,
+                            "unit_rate_pence_per_kwh": elec_unit,
+                        },
+                        "gas": {
+                            "standing_charge_pence_per_day": gas_standing,
+                            "unit_rate_pence_per_kwh": gas_unit,
+                        },
+                    }
+                )
+
+            save_choice = (
+                input(
+                    "\nDo you want to save these new plans to tariff_config.json? (y/N): "
+                )
+                .strip()
+                .lower()
+            )
+            if save_choice == "y":
+                if "comparison_plans" not in config:
+                    config["comparison_plans"] = []
+                config["comparison_plans"].extend(new_plans_config_format)
+                with open(Path("tariff_config.json"), "w") as f:
+                    json.dump(config, f, indent=4)
+                print("Saved new plans to config.")
+
+        if not plans:
+            print("\nNo comparison plans available. Please add at least one plan.")
+            return False
+
         actual_costs = {"electricity": [], "gas": []}
         current_tariff_costs = {"electricity": [], "gas": []}
         xlabels = []
