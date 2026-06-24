@@ -12,14 +12,25 @@
     },
     "comparison_plans": [
         {
-            "name": "Example Comparison Plan",
+            "name": "British",
             "electricity": {
-                "standing_charge_pence_per_day": 40.0,
-                "unit_rate_pence_per_kwh": 22.0
+                "standing_charge_pence_per_day": 47.833,
+                "unit_rate_pence_per_kwh": 22.416
             },
             "gas": {
-                "standing_charge_pence_per_day": 28.0,
-                "unit_rate_pence_per_kwh": 5.5
+                "standing_charge_pence_per_day": 21.718,
+                "unit_rate_pence_per_kwh": 6.401
+            }
+        },
+        {
+            "name": "Outfox",
+            "electricity": {
+                "standing_charge_pence_per_day": 49.704,
+                "unit_rate_pence_per_kwh": 21.35
+            },
+            "gas": {
+                "standing_charge_pence_per_day": 28.557,
+                "unit_rate_pence_per_kwh": 6.25
             }
         }
     ]

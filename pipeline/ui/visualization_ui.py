@@ -787,16 +787,16 @@ class VisualizationUI(BaseUI):
 
         print("\nYearly Total Cost Summary (Last 12 Months):")
 
-        curr_elec_total = sum(current_tariff_costs["electricity"]) / 100
-        curr_gas_total = sum(current_tariff_costs["gas"]) / 100
+        curr_elec_total = round(sum(current_tariff_costs["electricity"]) / 100, 2)
+        curr_gas_total = round(sum(current_tariff_costs["gas"]) / 100, 2)
         curr_total = curr_elec_total + curr_gas_total
         print(f"\nCurrent Tariff ({current_tariff.get('name', 'Config')}):")
         print(f"  Electricity: £{curr_elec_total:.2f}")
         print(f"  Gas: £{curr_gas_total:.2f}")
         print(f"  Total: £{curr_total:.2f}")
 
-        theo_elec_total = sum(theoretical_costs["electricity"]) / 100
-        theo_gas_total = sum(theoretical_costs["gas"]) / 100
+        theo_elec_total = round(sum(theoretical_costs["electricity"]) / 100, 2)
+        theo_gas_total = round(sum(theoretical_costs["gas"]) / 100, 2)
         theo_total = theo_elec_total + theo_gas_total
         print(f"\nTheoretical:")
         print(f"  Electricity: £{theo_elec_total:.2f}")
@@ -1092,8 +1092,8 @@ class VisualizationUI(BaseUI):
 
         print("\nYearly Total Cost Summary (Last 12 Months):")
 
-        curr_elec_total = sum(current_tariff_costs["electricity"]) / 100
-        curr_gas_total = sum(current_tariff_costs["gas"]) / 100
+        curr_elec_total = round(sum(current_tariff_costs["electricity"]) / 100, 2)
+        curr_gas_total = round(sum(current_tariff_costs["gas"]) / 100, 2)
         curr_total = curr_elec_total + curr_gas_total
         print(f"\nCurrent Tariff ({current_tariff.get('name', 'Config')}):")
         print(f"  Electricity: £{curr_elec_total:.2f}")
@@ -1101,8 +1101,10 @@ class VisualizationUI(BaseUI):
         print(f"  Total: £{curr_total:.2f}")
 
         for pidx, plan in enumerate(plans):
-            theo_elec_total = sum(theoretical_costs[pidx]["electricity"]) / 100
-            theo_gas_total = sum(theoretical_costs[pidx]["gas"]) / 100
+            theo_elec_total = round(
+                sum(theoretical_costs[pidx]["electricity"]) / 100, 2
+            )
+            theo_gas_total = round(sum(theoretical_costs[pidx]["gas"]) / 100, 2)
             theo_total = theo_elec_total + theo_gas_total
             print(f"\n{plan['name']} (Theoretical):")
             print(f"  Electricity: £{theo_elec_total:.2f}")
