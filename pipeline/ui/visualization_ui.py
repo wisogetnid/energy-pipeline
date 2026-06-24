@@ -542,7 +542,9 @@ class VisualizationUI(BaseUI):
                         label=f"{year} {resource_type}",
                         color=base_colors[idx % len(base_colors)],
                     )
-                plt.title(f"Monthly {resource_type.capitalize()} Consumption Comparison")
+                plt.title(
+                    f"Monthly {resource_type.capitalize()} Consumption Comparison"
+                )
                 plt.xlabel("Month")
                 plt.ylabel("Consumption")
                 plt.xticks(
@@ -574,10 +576,42 @@ class VisualizationUI(BaseUI):
 
         print(f"Created overlaid yearly comparison charts:")
         print(f"- Resource Consumption (stacked): {consumptionPath}")
-        print(f"- Electricity Consumption: {visualisationsDir / 'yearly_resource_consumption_electricity.png'}")
-        print(f"- Gas Consumption: {visualisationsDir / 'yearly_resource_consumption_gas.png'}")
+        print(
+            f"- Electricity Consumption: {visualisationsDir / 'yearly_resource_consumption_electricity.png'}"
+        )
+        print(
+            f"- Gas Consumption: {visualisationsDir / 'yearly_resource_consumption_gas.png'}"
+        )
         print(f"- Resource Cost (stacked): {costStackedPath}")
         print(f"- Cost (line): {costPath}")
+
+    def get_current_tariff_config(self):
+        config_path = Path("tariff_config.json")
+        if not config_path.exists():
+            default_config = {
+                "current_plan": {
+                    "name": "Current Plan",
+                    "electricity": {
+                        "standing_charge_pence_per_day": 0.0,
+                        "unit_rate_pence_per_kwh": 0.0,
+                    },
+                    "gas": {
+                        "standing_charge_pence_per_day": 0.0,
+                        "unit_rate_pence_per_kwh": 0.0,
+                    },
+                }
+            }
+            with open(config_path, "w") as f:
+                json.dump(default_config, f, indent=4)
+            print(f"\nCreated default tariff configuration file at {config_path}.")
+            print(
+                "Please update it with your actual current rates for an accurate baseline."
+            )
+            return default_config["current_plan"]
+
+        with open(config_path, "r") as f:
+            config = json.load(f)
+            return config.get("current_plan", {})
 
     def compare_theoretical_costs_cli(self):
         import calendar
@@ -615,6 +649,7 @@ class VisualizationUI(BaseUI):
             return False
         month_entries.sort()
         last_12 = month_entries[-12:]
+        current_tariff = self.get_current_tariff_config()
         print("\nEnter new rates:")
         elec_standing = self.get_float_input(
             "Electricity standing charge (pence per day): "
@@ -623,6 +658,7 @@ class VisualizationUI(BaseUI):
         gas_standing = self.get_float_input("Gas standing charge (pence per day): ")
         gas_unit = self.get_float_input("Gas unit rate (pence per kWh): ")
         actual_costs = {"electricity": [], "gas": []}
+        current_tariff_costs = {"electricity": [], "gas": []}
         theoretical_costs = {"electricity": [], "gas": []}
         xlabels = []
         for year, month, resource_consumptions, resource_costs in last_12:
@@ -631,15 +667,35 @@ class VisualizationUI(BaseUI):
             for resource in ["electricity", "gas"]:
                 consumption = resource_consumptions.get(resource, 0)
                 actual = resource_costs.get(resource, 0)
+                days_in_month = calendar.monthrange(year, month)[1]
                 if resource == "electricity":
-                    theo = (consumption * elec_unit) + (
-                        elec_standing * calendar.monthrange(year, month)[1]
+                    theo = (consumption * elec_unit) + (elec_standing * days_in_month)
+                    curr = (
+                        consumption
+                        * current_tariff.get("electricity", {}).get(
+                            "unit_rate_pence_per_kwh", 0.0
+                        )
+                    ) + (
+                        current_tariff.get("electricity", {}).get(
+                            "standing_charge_pence_per_day", 0.0
+                        )
+                        * days_in_month
                     )
                 else:
-                    theo = (consumption * gas_unit) + (
-                        gas_standing * calendar.monthrange(year, month)[1]
+                    theo = (consumption * gas_unit) + (gas_standing * days_in_month)
+                    curr = (
+                        consumption
+                        * current_tariff.get("gas", {}).get(
+                            "unit_rate_pence_per_kwh", 0.0
+                        )
+                    ) + (
+                        current_tariff.get("gas", {}).get(
+                            "standing_charge_pence_per_day", 0.0
+                        )
+                        * days_in_month
                     )
                 actual_costs[resource].append(actual)
+                current_tariff_costs[resource].append(curr)
                 theoretical_costs[resource].append(theo)
         import matplotlib.pyplot as plt
 
@@ -650,13 +706,22 @@ class VisualizationUI(BaseUI):
                 x,
                 actual_costs[resource],
                 marker="o",
-                label=f"Actual {resource.capitalize()} Cost",
+                label=f"Actual {resource.capitalize()} Cost (API)",
                 color=color,
             )
             plt.plot(
                 x,
+                current_tariff_costs[resource],
+                marker="s",
+                linestyle="-.",
+                label=f"Current {resource.capitalize()} ({current_tariff.get('name', 'Config')})",
+                color=color,
+                alpha=0.8,
+            )
+            plt.plot(
+                x,
                 theoretical_costs[resource],
-                marker="o",
+                marker="^",
                 linestyle="--",
                 label=f"Theoretical {resource.capitalize()} Cost",
                 color=color,
@@ -683,10 +748,12 @@ class VisualizationUI(BaseUI):
                     alpha=0.7,
                 )
         input_text = (
-            f"Electricity standing: {elec_standing} £/day\n"
-            f"Electricity unit: {elec_unit} £/kWh\n"
-            f"Gas standing: {gas_standing} £/day\n"
-            f"Gas unit: {gas_unit} £/kWh"
+            f"Current ({current_tariff.get('name', 'Config')}):\n"
+            f"  Elec: {current_tariff.get('electricity', {}).get('standing_charge_pence_per_day', 0.0)}p/d, {current_tariff.get('electricity', {}).get('unit_rate_pence_per_kwh', 0.0)}p/kWh\n"
+            f"  Gas: {current_tariff.get('gas', {}).get('standing_charge_pence_per_day', 0.0)}p/d, {current_tariff.get('gas', {}).get('unit_rate_pence_per_kwh', 0.0)}p/kWh\n"
+            f"New Plan:\n"
+            f"  Elec: {elec_standing}p/d, {elec_unit}p/kWh\n"
+            f"  Gas: {gas_standing}p/d, {gas_unit}p/kWh"
         )
         plt.gcf().text(
             0.99,
@@ -714,6 +781,32 @@ class VisualizationUI(BaseUI):
         plt.savefig(outpath)
         plt.close()
         print(f"\nComparison chart saved to: {outpath}")
+
+        print("\nYearly Total Cost Summary (Last 12 Months):")
+        actual_elec_total = sum(actual_costs["electricity"]) / 100
+        actual_gas_total = sum(actual_costs["gas"]) / 100
+        actual_total = actual_elec_total + actual_gas_total
+        print(f"Actual (API):")
+        print(f"  Electricity: £{actual_elec_total:.2f}")
+        print(f"  Gas: £{actual_gas_total:.2f}")
+        print(f"  Total: £{actual_total:.2f}")
+
+        curr_elec_total = sum(current_tariff_costs["electricity"]) / 100
+        curr_gas_total = sum(current_tariff_costs["gas"]) / 100
+        curr_total = curr_elec_total + curr_gas_total
+        print(f"\nCurrent Tariff ({current_tariff.get('name', 'Config')}):")
+        print(f"  Electricity: £{curr_elec_total:.2f}")
+        print(f"  Gas: £{curr_gas_total:.2f}")
+        print(f"  Total: £{curr_total:.2f}")
+
+        theo_elec_total = sum(theoretical_costs["electricity"]) / 100
+        theo_gas_total = sum(theoretical_costs["gas"]) / 100
+        theo_total = theo_elec_total + theo_gas_total
+        print(f"\nTheoretical:")
+        print(f"  Electricity: £{theo_elec_total:.2f}")
+        print(f"  Gas: £{theo_gas_total:.2f}")
+        print(f"  Total: £{theo_total:.2f}")
+
         return True
 
     def compare_theoretical_costs_multi_plans_cli(self):
@@ -751,6 +844,7 @@ class VisualizationUI(BaseUI):
             return False
         month_entries.sort()
         last_12 = month_entries[-12:]
+        current_tariff = self.get_current_tariff_config()
         num_plans = self.get_int_input(
             "How many energy plans do you want to compare? (1-5): ", 1, 5
         )
@@ -778,6 +872,7 @@ class VisualizationUI(BaseUI):
                 }
             )
         actual_costs = {"electricity": [], "gas": []}
+        current_tariff_costs = {"electricity": [], "gas": []}
         xlabels = []
         for year, month, resource_consumptions, resource_costs in last_12:
             label = f"{year}-{month:02d}"
@@ -786,6 +881,32 @@ class VisualizationUI(BaseUI):
                 consumption = resource_consumptions.get(resource, 0)
                 actual = resource_costs.get(resource, 0)
                 actual_costs[resource].append(actual)
+                days_in_month = calendar.monthrange(year, month)[1]
+                if resource == "electricity":
+                    curr = (
+                        consumption
+                        * current_tariff.get("electricity", {}).get(
+                            "unit_rate_pence_per_kwh", 0.0
+                        )
+                    ) + (
+                        current_tariff.get("electricity", {}).get(
+                            "standing_charge_pence_per_day", 0.0
+                        )
+                        * days_in_month
+                    )
+                else:
+                    curr = (
+                        consumption
+                        * current_tariff.get("gas", {}).get(
+                            "unit_rate_pence_per_kwh", 0.0
+                        )
+                    ) + (
+                        current_tariff.get("gas", {}).get(
+                            "standing_charge_pence_per_day", 0.0
+                        )
+                        * days_in_month
+                    )
+                current_tariff_costs[resource].append(curr)
         theoretical_costs = []
         for plan in plans:
             plan_costs = {"electricity": [], "gas": []}
@@ -813,8 +934,17 @@ class VisualizationUI(BaseUI):
                 x,
                 actual_costs[resource],
                 marker="o",
-                label=f"Actual {resource.capitalize()} Cost",
+                label=f"Actual {resource.capitalize()} Cost (API)",
                 color=color,
+            )
+            plt.plot(
+                x,
+                current_tariff_costs[resource],
+                marker="s",
+                linestyle="-.",
+                label=f"Current {resource.capitalize()} ({current_tariff.get('name', 'Config')})",
+                color=color,
+                alpha=0.8,
             )
             for i in x:
                 plt.annotate(
@@ -852,7 +982,8 @@ class VisualizationUI(BaseUI):
                         color=color,
                         alpha=0.7,
                     )
-        input_text = "\n".join(
+        input_text = f"Current ({current_tariff.get('name', 'Config')}): Elec Stand {current_tariff.get('electricity', {}).get('standing_charge_pence_per_day', 0.0)}p/d, Elec Unit {current_tariff.get('electricity', {}).get('unit_rate_pence_per_kwh', 0.0)}p/kWh, Gas Stand {current_tariff.get('gas', {}).get('standing_charge_pence_per_day', 0.0)}p/d, Gas Unit {current_tariff.get('gas', {}).get('unit_rate_pence_per_kwh', 0.0)}p/kWh\n"
+        input_text += "\n".join(
             [
                 f"{plan['name']}: Elec Stand {plan['elec_standing']}p/d, Elec Unit {plan['elec_unit']}p/kWh, Gas Stand {plan['gas_standing']}p/d, Gas Unit {plan['gas_unit']}p/kWh"
                 for plan in plans
@@ -882,6 +1013,33 @@ class VisualizationUI(BaseUI):
         plt.savefig(outpath)
         plt.close()
         print(f"\nComparison chart saved to: {outpath}")
+
+        print("\nYearly Total Cost Summary (Last 12 Months):")
+        actual_elec_total = sum(actual_costs["electricity"]) / 100
+        actual_gas_total = sum(actual_costs["gas"]) / 100
+        actual_total = actual_elec_total + actual_gas_total
+        print(f"Actual (API):")
+        print(f"  Electricity: £{actual_elec_total:.2f}")
+        print(f"  Gas: £{actual_gas_total:.2f}")
+        print(f"  Total: £{actual_total:.2f}")
+
+        curr_elec_total = sum(current_tariff_costs["electricity"]) / 100
+        curr_gas_total = sum(current_tariff_costs["gas"]) / 100
+        curr_total = curr_elec_total + curr_gas_total
+        print(f"\nCurrent Tariff ({current_tariff.get('name', 'Config')}):")
+        print(f"  Electricity: £{curr_elec_total:.2f}")
+        print(f"  Gas: £{curr_gas_total:.2f}")
+        print(f"  Total: £{curr_total:.2f}")
+
+        for pidx, plan in enumerate(plans):
+            theo_elec_total = sum(theoretical_costs[pidx]["electricity"]) / 100
+            theo_gas_total = sum(theoretical_costs[pidx]["gas"]) / 100
+            theo_total = theo_elec_total + theo_gas_total
+            print(f"\n{plan['name']} (Theoretical):")
+            print(f"  Electricity: £{theo_elec_total:.2f}")
+            print(f"  Gas: £{theo_gas_total:.2f}")
+            print(f"  Total: £{theo_total:.2f}")
+
         return True
 
     def get_float_input(self, prompt, min_value=None, max_value=None):

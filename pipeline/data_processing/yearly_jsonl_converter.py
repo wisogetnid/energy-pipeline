@@ -76,10 +76,7 @@ class YearlyEnergyDataConverter(EnergyDataConverter):
                 consumption_key = f"{resource}_consumption"
                 cost_key = f"{resource}_cost"
 
-                if (
-                    consumption_key in reading
-                    and reading[consumption_key] is not None
-                ):
+                if consumption_key in reading and reading[consumption_key] is not None:
                     if consumption is None:
                         consumption = 0
                     consumption += reading[consumption_key]

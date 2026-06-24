@@ -422,9 +422,7 @@ class TestEnergyDataConverter:
 
             json.dump(gas_cost_data, f)
 
-        output_files = converter.combine_all_resources(
-            test_data_dir
-        )
+        output_files = converter.combine_all_resources(test_data_dir)
 
         assert output_files is not None
         assert isinstance(output_files, list)

@@ -793,9 +793,7 @@ class DataRetrievalUI(BaseUI):
             output_dir = Path("data/processed")
 
             converter = EnergyDataConverter(output_dir=output_dir)
-            combined_filepath = converter.combine_all_resources(
-                temp_dir
-            )
+            combined_filepath = converter.combine_all_resources(temp_dir)
 
             if combined_filepath:
                 print(
@@ -822,9 +820,7 @@ class DataRetrievalUI(BaseUI):
                     for jsonl_file in combined_filepath:
                         print(f"\nConverting {Path(jsonl_file).name} to Parquet...")
                         parquet_filepath = (
-                            parquet_converter.convert_jsonl_to_parquet_file(
-                                jsonl_file
-                            )
+                            parquet_converter.convert_jsonl_to_parquet_file(jsonl_file)
                         )
                         if parquet_filepath:
                             parquet_filepaths.append(parquet_filepath)

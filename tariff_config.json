@@ -1,0 +1,13 @@
+{
+    "current_plan": {
+        "name": "My Current Tariff",
+        "electricity": {
+            "standing_charge_pence_per_day": 45.0,
+            "unit_rate_pence_per_kwh": 24.5
+        },
+        "gas": {
+            "standing_charge_pence_per_day": 29.6,
+            "unit_rate_pence_per_kwh": 6.0
+        }
+    }
+}

@@ -17,10 +17,8 @@ class DataConverterUI(BaseUI):
             energy_data_converter = EnergyDataConverter(output_dir=self.output_dir)
             target_data_directory = Path(directory) if directory else self.data_dir
 
-            combined_jsonl_filepath = (
-                energy_data_converter.combine_all_resources(
-                    target_data_directory
-                )
+            combined_jsonl_filepath = energy_data_converter.combine_all_resources(
+                target_data_directory
             )
 
             if not combined_jsonl_filepath:
@@ -29,9 +27,7 @@ class DataConverterUI(BaseUI):
                 )
                 return None
 
-            print(
-                f"\nAll resources successfully combined into monthly JSONL files."
-            )
+            print(f"\nAll resources successfully combined into monthly JSONL files.")
             for file_path in combined_jsonl_filepath:
                 print(f" - {file_path}")
             print(
@@ -118,7 +114,9 @@ class DataConverterUI(BaseUI):
         for jsonl_file in available_jsonl_files:
             print(f" - {jsonl_file.name}")
 
-        print(f"\nConverting data from {target_directory} to yearly JSONL and Parquet files...")
+        print(
+            f"\nConverting data from {target_directory} to yearly JSONL and Parquet files..."
+        )
 
         yearly_converter = YearlyEnergyDataConverter(output_dir=self.output_dir)
 
@@ -148,9 +146,7 @@ class DataConverterUI(BaseUI):
             print("\nConverting yearly JSONL files to Parquet format...")
             parquet_converter = JsonlToParquetConverter()
             successfully_converted_parquet_files = (
-                parquet_converter.convert_multiple_jsonl_files(
-                    conversion_result_files
-                )
+                parquet_converter.convert_multiple_jsonl_files(conversion_result_files)
             )
 
             if successfully_converted_parquet_files:
