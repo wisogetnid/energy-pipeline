@@ -1,4 +1,17 @@
 {
+    "previous_plans": {
+        "jul-2025-to-jul-2026": {
+            "name": "Ecotricity",
+            "electricity": {
+                "standing_charge_pence_per_day": 50.36,
+                "unit_rate_pence_per_kwh": 20.81
+            },
+            "gas": {
+                "standing_charge_pence_per_day": 45.46,
+                "unit_rate_pence_per_kwh": 5.03
+            }
+        }
+    },
     "current_plan": {
         "name": "Ecotricity",
         "electricity": {
@@ -12,14 +25,14 @@
     },
     "comparison_plans": [
         {
-            "name": "Outfox Family",
+            "name": "EcoLoyalty",
             "electricity": {
-                "standing_charge_pence_per_day": 49.704,
-                "unit_rate_pence_per_kwh": 21.35
+                "standing_charge_pence_per_day": 48.66,
+                "unit_rate_pence_per_kwh": 22.4
             },
             "gas": {
-                "standing_charge_pence_per_day": 58.47,
-                "unit_rate_pence_per_kwh": 5.45
+                "standing_charge_pence_per_day": 24.36,
+                "unit_rate_pence_per_kwh": 6.71
             }
         },
         {
