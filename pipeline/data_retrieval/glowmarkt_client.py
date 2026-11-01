@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 import requests
 
+REQUEST_TIMEOUT_SECONDS = 60
+
 
 class GlowmarktClient:
 
@@ -25,7 +27,9 @@ class GlowmarktClient:
             "applicationId": self.application_id,
         }
         payload = {"username": self.username, "password": self.password}
-        response = requests.post(auth_url, json=payload, headers=headers)
+        response = requests.post(
+            auth_url, json=payload, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS
+        )
         response.raise_for_status()
         data = response.json()
         self.token = data.get("token")
@@ -112,13 +116,17 @@ class GlowmarktClient:
         try:
             request_method = getattr(requests, method.lower())
             response = request_method(
-                url, params=params, headers=headers, json=json_data
+                url,
+                params=params,
+                headers=headers,
+                json=json_data,
+                timeout=REQUEST_TIMEOUT_SECONDS,
             )
             response.raise_for_status()
             return response.json()
         except requests.exceptions.ConnectionError as e:
-            raise ConnectionError(f"Failed to connect to {url}: {str(e)}")
+            raise ConnectionError(f"Failed to connect to {url}: {str(e)}") from e
         except requests.exceptions.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON response from {url}: {str(e)}")
+            raise ValueError(f"Invalid JSON response from {url}: {str(e)}") from e
         except requests.exceptions.RequestException as e:
-            raise Exception(f"Error retrieving data from {url}: {str(e)}")
+            raise RuntimeError(f"Error retrieving data from {url}: {str(e)}") from e

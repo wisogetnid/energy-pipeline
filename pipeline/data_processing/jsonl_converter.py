@@ -197,7 +197,7 @@ class EnergyDataConverter:
 
         total_entries_written = 0
         with open(output_jsonl_path, "w") as file_handle:
-            for timestamp, reading in sorted(merged_readings_map.items()):
+            for _, reading in sorted(merged_readings_map.items()):
                 combined_record = {
                     "resource_type": resource_type,
                     "consumption_id": resource_metadata_details["consumption_id"],
@@ -272,13 +272,10 @@ class EnergyDataConverter:
                 cost_files_by_unique_key[unique_resource_key] = str(file_path)
 
         matching_file_pairs_list = []
-        for key in consumption_files_by_unique_key:
+        for key, consumption_file_path in consumption_files_by_unique_key.items():
             if key in cost_files_by_unique_key:
                 matching_file_pairs_list.append(
-                    (
-                        consumption_files_by_unique_key[key],
-                        cost_files_by_unique_key[key],
-                    )
+                    (consumption_file_path, cost_files_by_unique_key[key])
                 )
 
         logger.info(
@@ -289,7 +286,6 @@ class EnergyDataConverter:
     def combine_all_resources(
         self,
         directory: Union[str, Path] = "data/glowmarkt_api_raw",
-        output_file: Optional[Union[str, Path]] = None,
     ) -> List[str]:
         directory_path = Path(directory)
         matching_file_pairs_list = self.find_matching_resource_files(directory_path)
@@ -391,7 +387,7 @@ class EnergyDataConverter:
                 continue
 
             if key == "unknown":
-                output_filename = f"all_resources_unknown_dates.jsonl"
+                output_filename = "all_resources_unknown_dates.jsonl"
             else:
                 year_str, month_str = key.split("-")
                 range_start_suffix = f"{year_str}{month_str}01"
@@ -441,12 +437,11 @@ class EnergyDataConverter:
         lowercase_resource_name = resource_name.lower()
         if "electricity" in lowercase_resource_name:
             return "electricity"
-        elif "gas" in lowercase_resource_name:
+        if "gas" in lowercase_resource_name:
             return "gas"
-        elif "water" in lowercase_resource_name:
+        if "water" in lowercase_resource_name:
             return "water"
-        else:
-            return "energy"
+        return "energy"
 
     def batch_combine_resource_files(self, directory: Union[str, Path]) -> List[str]:
         matching_file_pairs_list = self.find_matching_resource_files(directory)

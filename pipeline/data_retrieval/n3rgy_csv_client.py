@@ -102,7 +102,7 @@ class N3rgyCSVClient:
 
         with open(source_csv_path, "r") as csv_file:
             csv_reader = csv.reader(csv_file)
-            header_row = next(csv_reader)
+            next(csv_reader)
 
             for row in csv_reader:
                 if len(row) < 2:
@@ -209,7 +209,8 @@ class N3rgyCSVClient:
             f"Created consumption JSON from {source_csv_path} at {consumption_json_output_path}"
         )
         print(
-            f"Processed {len(consumption_readings)} readings from {earliest_reading_timestamp} to {latest_reading_timestamp}"
+            f"Processed {len(consumption_readings)} readings "
+            f"from {earliest_reading_timestamp} to {latest_reading_timestamp}"
         )
 
         cost_json_output_path = None
@@ -253,7 +254,8 @@ class N3rgyCSVClient:
                 f"Created cost JSON from {source_csv_path} at {cost_json_output_path}"
             )
             print(
-                f"Processed {len(cost_readings)} cost readings from {earliest_reading_timestamp} to {latest_reading_timestamp}"
+                f"Processed {len(cost_readings)} cost readings "
+                f"from {earliest_reading_timestamp} to {latest_reading_timestamp}"
             )
 
         return consumption_json_output_path, cost_json_output_path
@@ -407,7 +409,8 @@ class N3rgyCSVClient:
 
         print(f"Created combined JSONL file at: {destination_jsonl_path}")
         print(
-            f"Contains {len(merged_readings_by_timestamp)} readings from {overall_earliest_timestamp} to {overall_latest_timestamp}"
+            f"Contains {len(merged_readings_by_timestamp)} readings "
+            f"from {overall_earliest_timestamp} to {overall_latest_timestamp}"
         )
 
         return destination_jsonl_path
@@ -416,7 +419,7 @@ class N3rgyCSVClient:
         lowercase_filename = filename.lower()
         if "electricity" in lowercase_filename:
             return "electricity"
-        elif "gas" in lowercase_filename:
+        if "gas" in lowercase_filename:
             return "gas"
         return None
 

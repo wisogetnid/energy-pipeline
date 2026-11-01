@@ -16,22 +16,17 @@ It's also a playground to explore and refine my agentic coding setup.
 
 ## Getting Started
 
-The `go.sh` script in the root directory provides a convenient way to run common tasks. Run go without arguments to see a list of available commands
+The project uses [mise](https://mise.jdx.dev/) to pin tool versions and run common tasks. Run `mise tasks` to see a list of available tasks.
 
 ### Environment Setup
 
-1.  **Python Version:** The project uses Python 3.8 or higher. It is recommended to use a version manager like `asdf` to manage Python versions. The `.tool-versions` file specifies the exact Python version.
-2.  **Virtual Environment:** Use a virtual environment to manage project dependencies. Create a new environment by running:
+1.  **Tool Versions:** The `[tools]` section in `mise.toml` pins the exact Python and uv versions. Install them by running:
     ```bash
-    ./go.sh create-env
+    mise install
     ```
-    Activate the environment with:
+2.  **Install Dependencies:** Install the required dependencies from `pyproject.toml`. uv creates and manages the `.venv` virtual environment automatically:
     ```bash
-    source .venv/bin/activate
-    ```
-3.  **Install Dependencies:** Install the required dependencies from `pyproject.toml`:
-    ```bash
-    ./go.sh install
+    mise run install
     ```
 
 ### Running the Application
@@ -39,11 +34,11 @@ The `go.sh` script in the root directory provides a convenient way to run common
 The main application can be run using the following command:
 
 ```bash
-./go.sh run
+mise run run
 ```
 
 This will launch an interactive command-line interface (CLI) that allows you to choose from various options, such as retrieving data, converting data formats, and visualizing data.
 
 ### Testing the Application
 
-The `go.sh` command has a few arguments to run the tests, run the linter and `go.sh check` to run tests and linting together.
+Use `mise run test` to run the tests, `mise run lint` to run the linter and `mise run check` to run tests and linting together.

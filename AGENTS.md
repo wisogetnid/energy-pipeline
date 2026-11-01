@@ -8,14 +8,14 @@ This document provides instructions and guidelines for AI agents working on this
 Use **highly expressive and descriptive** variable and function names. Comments and docstrings **MUST be avoided entirely** in favor of self-documenting code. If you feel the need to add a comment, refactor the code to be more readable instead. This is a strict, non-negotiable directive.
 
 ### Command Constraints
-**AI Agents MUST ALWAYS use the `./go.sh` script for all interactions with the application, environment, and development tools.**
+**AI Agents MUST ALWAYS use the `mise` tasks for all interactions with the application, environment, and development tools.**
 
--   **Testing:** Use `./go.sh test` instead of `pytest`.
--   **Execution:** Use `./go.sh run` instead of `python -m pipeline`.
--   **Linting/Formatting:** Use `./go.sh lint` or `./go.sh format` instead of calling `pylint` or `black` directly.
--   **Setup:** Use `./go.sh install` or `./go.sh create-env` for environment management.
+-   **Testing:** Use `mise run test` instead of `pytest`.
+-   **Execution:** Use `mise run run` instead of `python -m pipeline`.
+-   **Linting/Formatting:** Use `mise run lint` or `mise run format` instead of calling `pylint` or `black` directly.
+-   **Setup:** Use `mise install` and `mise run install` for environment management.
 
-Directly executing the underlying tools is prohibited as the `go.sh` script ensures correct environment variables, paths, and configurations are applied.
+Directly executing the underlying tools is prohibited as the `mise` tasks ensure the pinned tool versions, paths, and configurations are applied.
 
 ## Project Overview
 
@@ -44,18 +44,13 @@ For a visual representation of the architecture, please refer to the diagram in 
 
 ### Environment Setup
 
-1.  **Python Version:** The project uses Python 3.8 or higher. It is recommended to use a version manager like `asdf` to manage Python versions. The `.tool-versions` file specifies the exact Python version.
-2.  **Virtual Environment:** Use a virtual environment to manage project dependencies. Create a new environment by running:
+1.  **Tool Versions:** The project uses [mise](https://mise.jdx.dev/) to manage tool versions. The `[tools]` section in `mise.toml` pins the exact Python and uv versions. Install them by running:
     ```bash
-    ./go.sh create-env
+    mise install
     ```
-    Activate the environment with:
+2.  **Install Dependencies:** Install the required dependencies from `pyproject.toml`. uv creates and manages the `.venv` virtual environment automatically:
     ```bash
-    source .venv/bin/activate
-    ```
-3.  **Install Dependencies:** Install the required dependencies from `pyproject.toml`:
-    ```bash
-    ./go.sh install
+    mise run install
     ```
 
 ### Running the Application
@@ -63,33 +58,31 @@ For a visual representation of the architecture, please refer to the diagram in 
 The main application can be run using the following command:
 
 ```bash
-./go.sh run
+mise run run
 ```
 
 This will launch an interactive command-line interface (CLI) that allows you to choose from various options, such as retrieving data, converting data formats, and visualizing data.
 
 ## Available Commands
 
-The `go.sh` script in the root directory provides a convenient way to run common tasks. Run go without arguments to see a list of available commands:
+The `mise.toml` file in the root directory defines the tasks for common development work. Run `mise tasks` to see a list of available tasks:
 
--   `./go.sh install` - Install required dependencies
--   `./go.sh run` - Run the complete energy pipeline
--   `./go.sh test` - Run all unit tests
--   `./go.sh test-coverage` - Run tests with coverage report
--   `./go.sh clean` - Clean up generated files
--   `./go.sh create-env` - Create a new virtual environment
--   `./go.sh lint` - Lint code with pylint
--   `./go.sh format` - Format code with black
--   `./go.sh check` - Run tests and lint code
-
-You might need to execute `chmod +x go.sh` to make the `go.sh` script executable.
+-   `mise install` - Install the pinned Python and uv versions
+-   `mise run install` - Install required dependencies
+-   `mise run run` - Run the complete energy pipeline
+-   `mise run test` - Run all unit tests
+-   `mise run test-coverage` - Run tests with coverage report
+-   `mise run clean` - Clean up generated files
+-   `mise run lint` - Lint code with pylint
+-   `mise run format` - Format code with black
+-   `mise run check` - Run tests and lint code
 
 ## Code Style and Conventions
 
--   **Formatting:** The project uses `black` for code formatting. Please run `./go.sh format` before committing any changes.
--   **Linting:** `pylint` is used for linting. Run `./go.sh lint` to check for any linting errors.
+-   **Formatting:** The project uses `black` for code formatting. Please run `mise run format` before committing any changes.
+-   **Linting:** `pylint` is used for linting. Run `mise run lint` to check for any linting errors.
 -   **Dependencies:** Project dependencies are managed in `pyproject.toml`.
--   **Testing:** The project uses `pytest` for unit testing. Tests are located in the `tests` directory. Run `./go.sh test` to execute all tests.
+-   **Testing:** The project uses `pytest` for unit testing. Tests are located in the `tests` directory. Run `mise run test` to execute all tests.
 -   **Code Conventions:** Follow PEP 8 guidelines for Python code.
 
 ## Key Components
@@ -99,7 +92,7 @@ You might need to execute `chmod +x go.sh` to make the `go.sh` script executable
 -   `pipeline/data_visualisation`: Contains modules for generating charts and visualizations of the energy data.
 -   `pipeline/ui`: Provides the command-line interface for interacting with the pipeline.
 -   `pipeline/tests`: Contains all the unit tests for the project.
--   `go.sh`: Defines the commands for managing the project.
+-   `mise.toml`: Pins tool versions and defines the tasks for managing the project.
 -   `pyproject.toml`: Specifies the project metadata and dependencies.
 
 ## How to Contribute

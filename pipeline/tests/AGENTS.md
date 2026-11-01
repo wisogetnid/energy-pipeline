@@ -22,7 +22,7 @@ The tests are organized into subdirectories that mirror the structure of the `pi
 To run all the tests, you can use the following command:
 
 ```bash
-./go.sh test
+mise run test
 ```
 
 ## How to Add New Tests
